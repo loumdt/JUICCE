@@ -6,6 +6,9 @@ Analysis of the links between extreme climate events, populations and impacts
 ### E-OBS dataset
 https://surfobs.climate.copernicus.eu/dataaccess/access_eobs.php#datafiles
 
+### ERA5-Land dataset
+https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land?tab=overview
+
 ### EM-DAT dataset
 https://public.emdat.be/data
 
