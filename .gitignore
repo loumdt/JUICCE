@@ -1,1 +1,4 @@
 Data/*
+!Data/E-OBS/Mask/make_mask_Europe_E-OBS_0.1deg
+!Data/E-OBS/Mask/Mask_Europe_ALL_E-OBS_0.1deg.nc
+Code/Mask/*.png
