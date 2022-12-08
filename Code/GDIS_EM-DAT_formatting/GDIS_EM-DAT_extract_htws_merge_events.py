@@ -1,19 +1,36 @@
-"""This script is used to merge events that have the same 'disasterno': 
+"""Extract European heatwave events from GDIS and EM-DAT databases (Excel file and geopackage).
+This script is also used to merge events that have the same 'disasterno': 
 a single event is initially registered several times, one for each affected 
 country/administrative region, and we sum damages and merge affected 
 territories into one single event."""
 #%%
-import numpy as np
-import geopandas as gpd
 import pandas as pd
+import geopandas as gpd
+import numpy as np
 from shapely.ops import unary_union
 import shapely
+#%%
+#Extract only European heatwaves from EM-DAT Europe extreme events (1950-2022):
+#EM-DAT data can be downloaded at https://public.emdat.be/
+df_emdat = pd.read_excel('Data/GDIS_EM-DAT/emdat_public_2022_11_10_Europe.xlsx',header=6,dtype={'Seq': str,'Year': str})
+#Add disasterno feature to be able to 'joint' easily with GDIS
+df_emdat.insert(3,'disasterno',df_emdat.loc[:,'Year']+'-'+df_emdat.loc[:,'Seq'])
+df_emdat=df_emdat[df_emdat['Disaster Subtype']=='Heat wave']
+df_emdat.to_excel('Data/GDIS_EM-DAT/EMDAT_Europe-1950-2022-heatwaves.xlsx')
+#%%
+#Extract European heatwaves from GDIS, using newly created EM-DAT database
+df_gdis = pd.read_excel('Data/GDIS_EM-DAT/pend-gdis-1960-2018-disasterlocations.xlsx',header=0)
+df_gdis.replace({'extreme temperature ': 'extreme temperature'}, regex=True,inplace=True) #suppress text space at the end, to avoid future mistakes
+df_gdis = df_gdis[df_gdis['disasterno'].isin(df_emdat.loc[:,'disasterno'].values)]
+df_gdis.to_excel('Data/GDIS_EM-DAT/GDIS_Europe-1960-2018-heatwaves.xlsx')
 
+#GeoPackage file :
+df_gdis2 = gpd.read_file('Data/GDIS_EM-DAT/pend-gdis-1960-2018-disasterlocations.gpkg')
+df_gdis2.replace({'extreme temperature ': 'extreme temperature'}, regex=True,inplace=True) #suppress text space at the end, to avoid future mistakes
+df_gdis2 = df_gdis2[df_gdis2['disasterno'].isin(df_emdat.loc[:,'disasterno'].values)]
+df_gdis2.to_file('Data/GDIS_EM-DAT/GDIS_Europe-1960-2018-heatwaves.gpkg')
 #%%
 #Merge events in EM-DAT excel file
-
-df_emdat = pd.read_excel('D:/Ubuntu/These/Data/GDIS_EM-DAT/EMDAT_Europe-1950-2022-heatwaves.xlsx',header=0,index_col=0,dtype={'Start Year': str,'End Year': str,'Start Month': str,'End Month': str,'Start Day': str,'End Day': str,'Adm Level': str,'Admin1 Code': str,'Admin2 Code': str})
-
 df_emdat.insert(32,'Start Date (DD-MM-YYYY)',df_emdat.loc[:,'Start Day']+'-'+df_emdat.loc[:,'Start Month']+'-'+df_emdat.loc[:,'Start Year']) #insert a Start date
 df_emdat.insert(36,'End Date (DD-MM-YYYY)',df_emdat.loc[:,'End Day']+'-'+df_emdat.loc[:,'End Month']+'-'+df_emdat.loc[:,'End Year']) #insert an End date
 output_df = pd.DataFrame(columns=df_emdat.columns.values)
@@ -34,11 +51,10 @@ for code in np.unique(df_emdat.loc[:,'disasterno'].values):
     idx+=1
 
 #Export Excel file
-output_df.to_excel('D:/Ubuntu/These/Data/GDIS_EM-DAT/EMDAT_Europe-1950-2022-heatwaves_merged.xlsx')
+output_df.to_excel('Data/GDIS_EM-DAT/EMDAT_Europe-1950-2022-heatwaves_merged.xlsx')
 
 #%%
 #Merge events in GDIS GeoPackage file
-df_gdis = gpd.read_file('D:/Ubuntu/These/Data/GDIS_EM-DAT/GDIS_Europe-1960-2018-heatwaves.gpkg',header=0,index_col=0,dtype={'disasterno': str,'geometry':shapely.geometry.multipolygon.MultiPolygon})
 output_df_gdis = gpd.GeoDataFrame(columns=df_gdis.columns.values)
 
 idx=1
@@ -56,4 +72,4 @@ for code in np.unique(df_gdis.loc[:,'disasterno'].values):
     idx+=1
 
 #Export Geopackage file
-output_df_gdis.to_file('D:/Ubuntu/These/Data/GDIS_EM-DAT/GDIS_Europe-1960-2018-heatwaves_merged.gpkg',driver ='GPKG')
+output_df_gdis.to_file('Data/GDIS_EM-DAT/GDIS_Europe-1960-2018-heatwaves_merged.gpkg',driver ='GPKG')
