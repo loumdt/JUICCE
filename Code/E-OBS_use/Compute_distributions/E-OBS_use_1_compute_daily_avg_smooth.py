@@ -1,16 +1,17 @@
-"""Compute, for each calendar day, the daily mean, max or min temperature, averaged over the chosen period (default 1950-2021).
+"""Compute, for each calendar day, the daily mean, max or min temperature, averaged over the chosen period.
 The seasonal cycle is then smoothed with a 31-day window.
-Argument 1 is either tg for mean, tn for min or tx for max. 
-Argument 2 and 3 are respectively the first year and the last year to be included in the computation."""
+Argument 1 is either tg for mean, tn for min or tx for max (default tg). 
+Argument 2 and 3 are respectively the first year and the last year to be included in the computation (default 1950 and 2021)."""
 #%%
 import numpy as np
-import numpy.ma as ma
-import netCDF4 as nc
-from datetime import datetime
-from tqdm import tqdm
-import sys
-import pandas as pd
+import numpy.ma as ma #use masked array
+import netCDF4 as nc #load and write netcdf data
+from datetime import datetime #create file history with creation date
+from tqdm import tqdm #create a user-friendly feedback while script is running
+import sys #read inputs
+import pandas as pd #handle dataframes
 
+#read inputs or use defaults inputs
 try : 
     the_variable = str(sys.argv[1])
 except :
@@ -29,29 +30,27 @@ except :
 
 print('the_variable :',the_variable)
 #%%
+#Load netcdf file :
 nc_file_in="Data/E-OBS/0.1deg/"+the_variable+"_ens_mean_0.1deg_reg_v26.0e.nc" # path to E-OBS data netCDF file
-
 print('nc_file_in',nc_file_in)
-f=nc.Dataset(nc_file_in, mode='r')
-lat_in=f.variables['latitude']
-lon_in=f.variables['longitude']
-time_in=f.variables['time']
+f=nc.Dataset(nc_file_in, mode='r') #load file
+lat_in=f.variables['latitude'][:] #load dimensions
+lon_in=f.variables['longitude'][:]
+time_in=f.variables['time'][:]
 #%%
 #-------------------------------------
 #import a xlsx table containing the index of each 1st january and 31st December
 df_bis_year = pd.read_excel("Code/E-OBS_use/Compute_distributions/Dates_converter_1.xlsx",header=0, index_col=0)
-df_bis_year = df_bis_year.loc[year_beg:year_end,:]
+df_bis_year = df_bis_year.loc[year_beg:year_end,:] #select chosen period
 nb_day_in_year = np.array(df_bis_year.loc[:,"Nb_days"].values) #365 or 366, depending on whether the year is bisextile or not
 idx_start_year = np.array(df_bis_year.loc[:,"Idx_start"].values) #index of 1st january for each year
 
 #%%
 #-------------------------------------
-
+#Define netCDF output file :
 #Compute the temperature data averaged over the chosen period (default 1950-2021) for every calendar day of the year and store it in a netCDF file.
 nc_file_out=nc.Dataset("Data/E-OBS/0.1deg/"+the_variable+"_daily_avg_"+str(year_beg)+"_"+str(year_end)+"_smoothed.nc",mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
 
-#-----------
-#Define netCDF output file :
 lat_dim = nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
 lon_dim = nc_file_out.createDimension('lon', len(lon_in))    # longitude axis
 time_dim = nc_file_out.createDimension('time', None) # unlimited axis (can be appended to).
@@ -76,24 +75,21 @@ temp.standard_name = 'air_temperature' # this is a CF standard name
 
 nlats = len(lat_dim); nlons = len(lon_dim); ntimes = 366
 # Write latitudes, longitudes.
-# Note: the ":" is necessary in these "write" statements
-
+# Note: the ":" is necessary in these "write" statements -> you want to write the content and not to change the definition of the dimension
 lat[:] = lat_in[:] 
 lon[:] = lon_in[:]
 time[:]=range(366)
 
 #-----------
+#Load the mask file :
+nc_file_mask="Data/E-OBS/Mask/Mask_Europe_E-OBS_0.1deg.nc" #path to the file to load the corrected mask for all Europe
+f_mask=nc.Dataset(nc_file_mask,mode='r') #load file
+Mask_0 = f_mask.variables['mask_all'][:] #load variable
 
-nc_file_mask="Data/E-OBS/Mask/Mask_Europe_E-OBS_0.1deg.nc" #file to load the corrected mask for all Europe
-f_mask=nc.Dataset(nc_file_mask,mode='r')
-Mask_0 = f_mask.variables['mask_all'][:] #corrected mask
-
-temp[:,:,:]=ma.array(np.zeros((366,len(lat_in),len(lon_in))),mask=[Mask_0]*366)
+temp[:,:,:]=ma.array(np.zeros((366,len(lat_in),len(lon_in))),mask=[Mask_0]*366) #set output netcdf variable
 #%%
 print("Computing climatology...")
 for day_of_the_year in tqdm(range(366)): #Compute average daily temperature for each calendar day of the year, over the 1950-2020 period -> 366 days
-
-	#print("day of the year", day_of_the_year)
 	bis_years=[idx for idx,e in enumerate(nb_day_in_year) if e==366] #indices of bisextile years
 	not_bis_years=[idx for idx,e in enumerate(nb_day_in_year) if e==365] #indices of non-bisextile years
 
