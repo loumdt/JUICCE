@@ -1,0 +1,3 @@
+- Valorisation des dégâts (e.g. si un bidonville est détruit par une inondation est-ce que cela est valorisé à 0 car "ne vaut rien" en termes monétaires ?)
+- Penser à la méthode SVD (Single Value Decomposition)
+- Lire « Canicule. Chicago, été 1995. Autopsie sociale d’une catastrophe » (Heat Wave. A Social Autopsy of Disaster in Chicago), d’Eric Klinengerg, traduit de l’anglais (Etats-Unis) par Marc Saint-Upéry, avant-propos de Michel Lussault, Deux-cent-cinq/Ecole urbaine de Lyon, « A partir de l’anthropocène », 416 p., 22 €

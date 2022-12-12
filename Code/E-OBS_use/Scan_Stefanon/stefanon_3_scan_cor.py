@@ -3,13 +3,14 @@ Argument 1 is either tg for mean, tx for max, or tn for min (default tg).
 Argument 2 and 3 are the years of the chosen period (default 1950 and 2021).
 Argument 4 is the percentile threshold (default 95).
 """
+#%%
 import numpy as np
 import numpy.ma as ma 
 import netCDF4 as nc 
 from datetime import date, timedelta, datetime
 from tqdm import tqdm
 import sys,os
-
+#%%
 try : 
     the_variable = str(sys.argv[1])
 except :
@@ -131,10 +132,10 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 	sea_cpt_table_bool_4d=np.zeros((len(lat_in),len(lon_in),scan_lat,scan_lon))
 	weight_table_4d=np.zeros((len(lat_in),len(lon_in),scan_lat,scan_lon))
 
-	for i in tqdm(range(int((len(lat)-scan_lat)/2))) :
-		for j in range(int((len(lon)-scan_lon)/2)) :
-			weight_table_4d[i*2,j*2,:,:]=np.array([weight[i*2:i*2+scan_lat]]*scan_lon)
-			sea_cpt_table_bool_4d[i*2,j*2,:,:]=np.array(land_sea_mask[i*2:i*2+scan_lat,j*2:j*2+scan_lon]==True)
+	for i in tqdm(range((len(lat)-scan_lat))) :
+		for j in range((len(lon)-scan_lon)) :
+			weight_table_4d[i,j,:,:]=np.array([weight[i:i+scan_lat]]*scan_lon)
+			sea_cpt_table_bool_4d[i,j,:,:]=np.array(land_sea_mask[i:i+scan_lat,j:j+scan_lon]==True)
 
 	weight_table_2d=np.sum(weight_table_4d,-1) #sum the weight of one scanning window, longitude axis
 	weight_table_2d=np.sum(weight_table_2d,-1) #sum the weight of one scanning window, latitude axis
@@ -147,17 +148,17 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 	#-------------------
 
 	for year in tqdm(range(an)) :
-		red = ma.array(f.variables['temp'][year*92:(year+1)*92,:,:],mask=[land_sea_mask]*92) # start = 01/06 ; end = 31/08 ; SHAPE = (time,lat,lon)
+		red = ma.array(f.variables['temp'][year*92:(year+1)*92,:,:])#,mask=[land_sea_mask]*92) # start = 01/06 ; end = 31/08 ; SHAPE = (time,lat,lon)
 		red = ma.masked_values(red,-9999) #mask values that do not exceed the percentile threshold
 		siz = np.shape(red) #siz[1]=lat, siz[2]=lon
 		#make the scan operation of each zone in order to determine the heatwaves dates, stored into the netCDF file
 		for t in range(92) :
 			cpt_table_bool=ma.array(np.zeros((siz[1],siz[2],scan_lat,scan_lon)),mask=False) #siz[1]=lat, siz[2]=lon
 
-			if red[t,:,:].any() :
-				for i in range(int((len(lat)-scan_lat)/2)) :
-					for j in range(int((len(lon)-scan_lon)/2)) :
-						cpt_table_bool[i*2,j*2,:,:]=ma.array(1-red[t,i*2:i*2+scan_lat,j*2:j*2+scan_lon].mask) #this takes time, could probably be improved
+			if not red[t,:,:].mask.all() :
+				for i in range((len(lat)-scan_lat)) :
+					for j in range((len(lon)-scan_lon)) :
+						cpt_table_bool[i,j,:,:]=ma.array(1-red[t,i:i+scan_lat,j:j+scan_lon].mask) #this takes time, could probably be improved
 			
 			cpt_table = cpt_table_bool*weight_table_4d
 
@@ -165,12 +166,12 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 			cpt_table = np.sum(cpt_table,-1)
 
 			detect_heatwave_table_bool=np.array(cpt_table > np.round((weight_table_2d-sea_cpt_table)*pourcent)) #each cell is the result of the matching scanning window
-			#the previous line entails an issue on coastlines -> the scanning operation is biased on these points, I decided to correct it with a second scanning operation (scan_cor_2nd_time.py)
+			#the previous line entails an issue on coastlines -> the scanning operation is biased on these points, I decided to correct it with a second scanning operation (stefanon_4_scan_cor_2nd_time.py)
 			if detect_heatwave_table_bool.any() : #Check if at least one of the scanning windows has detected a sub-heatwave
 				ntimes=np.shape(temp)[0] #take the time dimension length in order to know the next index to use
 				date_idx[ntimes]=year*92+t
 				date_format[ntimes] = nc.stringtochar(np.array([calendar[year,t]], 'S10'))
-				temp[ntimes,:,:]=ma.array(np.zeros((siz[1],siz[2])),mask=red[t,:,:].mask) #siz[1]=lat, siz[2]=lon
+				temp[ntimes,:,:]=ma.array(-9999*np.ones((siz[1],siz[2])),mask=red[t,:,:].mask) #siz[1]=lat, siz[2]=lon
 				stack_where=np.argwhere(detect_heatwave_table_bool)
 				for i,j in stack_where:
 					temp[ntimes,i:i+scan_lon,j:j+scan_lat] = red[t,i:i+scan_lon,j:j+scan_lat] #save the temperature anomalies responsible for the sub-heatwave

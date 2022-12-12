@@ -2,14 +2,14 @@
 Argument 1 is either tg for mean, tx for max, or tn for min (default tg).
 Arguments 2 and 3 are the boundary years of the chosen period, both included in the calculation, given as integers (default 1950 and 2021).
 Argument 4 is the percentile threshold corresponding to the heatwave definition, given as an integer (default 95 i.e. the 95th percentile threshold)."""
-
+#%%
 import numpy as np
 import numpy.ma as ma 
 import netCDF4 as nc 
 from datetime import datetime
 from tqdm import tqdm
 import sys,os
-
+#%%
 try : 
 	the_variable = str(sys.argv[1])
 except :
@@ -37,9 +37,9 @@ pourcent = 0.1 #arbitrary value which seems to be working (have to fix coastline
 def scan(the_variable,scan_size,threshold_value,pourcent) :
 #--------------------------------------------
 	try :
-		nc_file = os.path.join(os.environ["DATADIR"] , "E-OBS" , "Detection_Canicule" ,"compress_heatwaves_4days_scan_1_"+the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_scan_size"+str(scan_size)+"_"+str(pourcent*100)+"%.nc")
+		nc_file = os.path.join(os.environ["DATADIR"] , "E-OBS" , "Detection_Canicule" ,"compress_heatwaves_4days_scan_1_"+the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_scan_size"+str(scan_size)+"_60.0%.nc")
 	except :
-		nc_file = "Data/E-OBS/Detection_Canicule/compress_heatwaves_4days_scan_1_"+the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_scan_size"+str(scan_size)+"_"+str(pourcent*100)+"%.nc"
+		nc_file = "Data/E-OBS/Detection_Canicule/compress_heatwaves_4days_scan_1_"+the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_scan_size"+str(scan_size)+"_60%.nc"
 
 	#the 'temp' variable is the daily mean, max or min temperature anomaly, set to zero when not exceeding the threshold defined by the 95th percentile temperature anomaly
 
@@ -57,14 +57,14 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 	lon_in=f.variables['lon'][:] 
 	time_in=range(np.shape(f.variables['temp'])[0])
 	date_idx_in=f.variables['date_idx'][:]
+	date_idx_1950_in=f.variables['date_idx_1950'][:]
 	date_format_in=f.variables['date_format'][:] #date as a string, yyyy-mm-dd format
-	date_format_readable=np.ndarray(np.shape(date_format_in)[0],dtype=object) #make date_format human-readable
-	date_format_readable_year_only=np.ndarray(np.shape(date_format_in)[0],dtype=object) #keep only the last four characters of the date (corresponding to the year)
-
-	for i in range(np.shape(date_format_in)[0]):
-		date_format_readable[i]=str(date_format_in[i].tobytes())[2:-1]
-		date_format_readable_year_only[i]=date_format_readable[i][2:6]
-
+	date_format_readable = [""]*len(date_idx_in)
+	date_format_readable_year_only=[""]*len(date_idx_in) #keep only the last four characters of the date (corresponding to the year)
+	for i in tqdm(range(len(date_format_in))) :
+		date_format_readable[i] = "".join(date_format_in[:].astype(str).data[i])
+		date_format_readable_year_only[i] = (date_format_readable[i])[:4]
+	
 	year_list=list(set(date_format_readable_year_only))
 	year_list.sort()
 
@@ -81,8 +81,8 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 	nc_file_out.createDimension('time', None) # unlimited time axis (can be appended to).
 	nc_file_out.createDimension('nchar', 10) #in order to save dates on date format as strings
 
-	nc_file_out.title="Daily "+temp_name_dict[the_variable]+" temperature anomaly for summer days corresponding to a sub-heatwave day, from 1950 to 2020"
-	nc_file_out.subtitle="values put to zero where not exceeding 95th temperature anomaly threshold. Created with scan_cor_2nd_time.py on "+ datetime.today().strftime("%d/%m/%y")
+	nc_file_out.title="Daily "+temp_name_dict[the_variable]+" temperature anomaly for summer days corresponding to a sub-heatwave day, from "+str(year_beg)+" to "+str(year_end)
+	nc_file_out.subtitle="values put to zero where not exceeding 95th temperature anomaly threshold. Created with scan_cor_2nd_time.py on "+ datetime.today().strftime("%y/%m/%d")
 
 	lat = nc_file_out.createVariable('lat', np.float32, ('lat',))
 	lat.units = 'degrees_north'
@@ -91,16 +91,16 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 	lon.units = 'degrees_east'
 	lon.long_name = 'longitude'
 	time = nc_file_out.createVariable('time', np.float32, ('time',))
-	time.units = 'days of summer containing a sub-heatwave from 1950 to 2020'
+	time.units = 'days of summer containing a sub-heatwave from '+str(year_beg)+' to '+str(year_end)
 	time.long_name = 'time'
 	# Define a 3D variable to hold the data
 	temp = nc_file_out.createVariable('temp',np.float64,('time','lat','lon')) # note: unlimited dimension is leftmost
 	temp.units = '°C' # degrees Celsius
 	date_idx = nc_file_out.createVariable('date_idx', np.int32,('time',))
-	date_idx.units = 'days of summer containing a sub-heatwave from 1950 to 2020, recorded as the matching index of the temp_anomaly_summer_only_1950-2020_scaled_to_95th.nc file'
+	date_idx.units = 'days of summer containing a sub-heatwave from '+str(year_beg)+' to '+str(year_end)+', recorded as the matching index of the temp_anomaly_summer_only_'+str(year_beg)+'_'+str(year_end)+'_scaled_to_95th.nc file'
 	date_idx.long_name = 'date_index'
 	date_idx_1950 = nc_file_out.createVariable('date_idx_1950', np.int32,('time',))
-	date_idx_1950.units = 'days from 01-01-1950'
+	date_idx_1950.units = 'days from 1950-01-01'
 	date_idx_1950.long_name = 'date_index_1950'
 	date_format = nc_file_out.createVariable('date_format', 'S1',('time','nchar'))
 	date_format.units = 'days on YYYY-mm-dd format'
@@ -125,10 +125,10 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 	sea_cpt_table_bool_4d=np.zeros((len(lat_in),len(lon_in),scan_lat,scan_lon))
 	weight_table_4d=np.zeros((len(lat_in),len(lon_in),scan_lat,scan_lon))
 
-	for i in tqdm(range(int((len(lat)-scan_lat)/2))) :
-		for j in range(int((len(lon)-scan_lon)/2)) :
-			weight_table_4d[i*2,j*2,:,:]=np.array([weight[i*2:i*2+scan_lat]]*scan_lon)
-			sea_cpt_table_bool_4d[i*2,j*2,:,:]=np.array(land_sea_mask[i*2:i*2+scan_lat,j*2:j*2+scan_lon]==True)
+	for i in tqdm(range((len(lat)-scan_lat))) :
+		for j in range((len(lon)-scan_lon)) :
+			weight_table_4d[i,j,:,:]=np.array([weight[i:i+scan_lat]]*scan_lon)
+			sea_cpt_table_bool_4d[i,j,:,:]=np.array(land_sea_mask[i:i+scan_lat,j:j+scan_lon]==True)
 
 	weight_table_2d=np.sum(weight_table_4d,-1) #sum the weight of one scanning window, longitude axis
 	weight_table_2d=np.sum(weight_table_2d,-1) #sum the weight of one scanning window, latitude axis
@@ -153,9 +153,9 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 		for day in indice :
 			cpt_table_bool=ma.array(np.zeros((siz[1],siz[2],scan_lat,scan_lon)),mask=False) #siz[1]=lat, siz[2]=lon
 			cpt_table_bool=ma.array(np.zeros((siz[1],siz[2],scan_lat,scan_lon)),mask=False) #siz[1]=lat, siz[2]=lon
-			for i in range(int((len(lat)-scan_lat)/2)) :
-				for j in range(int((len(lon)-scan_lon)/2)) :
-					cpt_table_bool[i*2,j*2,:,:]=ma.array(red[day-indice[0],i*2:i*2+scan_lat,j*2:j*2+scan_lon]>0) #this takes time, could probably be improved
+			for i in range((len(lat)-scan_lat)) :
+				for j in range((len(lon)-scan_lon)) :
+					cpt_table_bool[i,j,:,:]=ma.array(red[day-indice[0],i:i+scan_lat,j:j+scan_lon]>0) #this takes time, could probably be improved
 			
 			cpt_table = cpt_table_bool*weight_table_4d
 			cpt_table = np.sum(cpt_table,-1)
@@ -167,13 +167,13 @@ def scan(the_variable,scan_size,threshold_value,pourcent) :
 				ntimes=np.shape(temp)[0] #take the time dimension length in order to know the next index to use
 				date_idx[ntimes]=date_idx_in[day]
 				date_format[ntimes] = date_format_in[day]
-				date_idx_1950[ntimes] = date_idx_1950[day]
-				temp[ntimes,:,:]=ma.array(np.zeros((siz[1],siz[2])),mask=land_sea_mask) #siz[1]=lat, siz[2]=lon
+				date_idx_1950[ntimes] = date_idx_1950_in[day]
+				temp[ntimes,:,:]=ma.array(-9999*np.ones((siz[1],siz[2])),mask=land_sea_mask) #siz[1]=lat, siz[2]=lon
 				stack_where=np.argwhere(detect_heatwave_table_bool)
 				for i,j in stack_where:
 					temp[ntimes,i:i+scan_lon,j:j+scan_lat] = red[day-indice[0],i:i+scan_lon,j:j+scan_lat] #save the temperature anomalies responsible for the sub-heatwave
 	time[:]=range(ntimes+1)
-
+	temp[:]=ma.masked_outside(temp,-100,100)
 	print('save done')
 	print('Number of recorded sub-heatwave days :', ntimes+1)
 
