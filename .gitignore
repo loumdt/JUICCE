@@ -3,3 +3,5 @@ Data/*
 !Data/E-OBS/Mask/Mask_Europe_E-OBS_0.1deg.nc
 Code/Mask/*.png
 Mask/*.png
+*.mp4
+ffmpeg.exe
