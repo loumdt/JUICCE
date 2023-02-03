@@ -4,7 +4,7 @@ In this figures, we represent heatwaves as 3D objects in a Longitude x Latitude 
 
 [All heatwaves of the period]
 
-[Heatwaves of the year 1950]
+[Heatwaves of the year 1950](https://loumdt.github.io/JUICCE/blob/main/docs/heatwaves_3D_1950.html)
 
 [Heatwaves of the year 1951]
 
