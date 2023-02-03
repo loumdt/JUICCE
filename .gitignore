@@ -5,3 +5,5 @@ Code/Mask/*.png
 Mask/*.png
 *.mp4
 ffmpeg.exe
+*.png
+animation_backup
