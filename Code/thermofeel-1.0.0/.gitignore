@@ -1,0 +1,15 @@
+.*
+?.*
+!.gitignore
+!.github
+__pycache__/
+htmlcov
+docs/build/*
+*.csv
+*.grib
+*.npz
+*.png
+*.old
+*.pyc
+*.egg-info/
+.vscode/
