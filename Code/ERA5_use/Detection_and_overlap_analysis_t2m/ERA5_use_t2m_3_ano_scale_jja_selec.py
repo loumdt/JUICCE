@@ -38,7 +38,7 @@ except :
 try : 
     threshold_value = int(sys.argv[4])
 except :
-    threshold_value = 90
+    threshold_value = 95
 
 print('the_variable :',the_variable)
 print('year_beg :',year_beg)
@@ -90,7 +90,7 @@ t2m.long_name = 'daily '+temp_name_dict[the_variable]+' temperature anomaly'
 #-----------
 #%%
 #Only record the JJA temperatures and KEEP the values that do not exceed the n-th (default 95th) percentile threshold
-nc_out_not_scaled_path = os.path.join(datadir,"ERA5","t2m",the_variable+"_anomaly_JJA_only_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th.nc")#path to the output netCDF file
+nc_out_not_scaled_path = os.path.join(datadir,"ERA5","t2m",f"{the_variable}_anomaly_JJA_{year_beg}_{year_end}.nc")#path to the output netCDF file
 nc_file_out_not_scaled=nc.Dataset(nc_out_not_scaled_path,mode='w',format='NETCDF4_CLASSIC') 
 #Define netCDF output file :
 lat_dim_not_scaled = nc_file_out_not_scaled.createDimension('lat', len(lat_in))    # latitude axis

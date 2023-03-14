@@ -49,7 +49,7 @@ print('nb_days :',nb_days)
 df_emdat = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0)
 flex_time_span = 7 #In order to account for potential EM-DAT imprecisions, we set a flexibility window of 7 days.
 #%%
-nc_file_in = os.path.join(datadir , "ERA5" , "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
+nc_file_in = os.path.join(datadir , "ERA5" ,"t2m", "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
 
 f=nc.Dataset(nc_file_in,mode='r')
 lat_in=f.variables['lat'][:]

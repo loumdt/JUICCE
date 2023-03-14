@@ -57,7 +57,7 @@ df_emdat = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2
 flex_time_span = 7 #In order to account for potential EM-DAT imprecisions, we set a flexibility window of 7 days
 #%% 
 # # cc3d labels netCDF file
-nc_file_in = os.path.join(datadir , "ERA5" , "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
+nc_file_in = os.path.join(datadir , "ERA5" ,"t2m", "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
 
 f=nc.Dataset(nc_file_in,mode='r')
 lat_in=f.variables['lat'][:]
@@ -68,7 +68,7 @@ time_in = np.ndarray(shape=np.shape(date_idx_JJA),dtype=int)
 time_in[:] = date_idx_JJA[:]
 
 #%%
-nc_file_potential_htws = os.path.join(datadir , "ERA5" , "Detection_Canicule" , "potential_heatwaves_"+the_variable+"_"+str(nb_days)+"days_before_scan_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th.nc")
+nc_file_potential_htws = os.path.join(datadir , "ERA5" , "t2m", "Detection_Canicule" , "potential_heatwaves_"+the_variable+"_"+str(nb_days)+"days_before_scan_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th.nc")
 print('nc_file_potential_htws',nc_file_potential_htws)
 f_pot_htws=nc.Dataset(nc_file_potential_htws, mode='r')
 date_format=f_pot_htws.variables['date_format'][:] #date as a string, yyyy-mm-dd format
@@ -89,7 +89,7 @@ f_land_sea_mask = nc.Dataset(os.path.join(datadir,"ERA5","Mask","Mask_Europe_lan
 land_sea_mask = f_land_sea_mask.variables['mask'][:]
 #%% 
 #load JJA temperature anomaly data file
-nc_file_temp = os.path.join(datadir, "ERA5", "t2m", the_variable+"_anomaly_JJA_only_"+str(year_beg)+"_"+str(year_end)+".nc")
+nc_file_temp = os.path.join(datadir, "ERA5", "t2m", the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+".nc")
 f_temp=nc.Dataset(nc_file_temp, mode='r')
         
 #%% 
@@ -133,7 +133,7 @@ for idx in tqdm(df_emdat.index.values) :
         country=df_emdat.loc[idx,'Country']
         year_event = df_emdat.loc[idx,'Year']
         labels_cc3d = f.variables['label'][(year_event-year_beg)*92:(year_event-year_beg+1)*92,:,:] #load all JJA cc3d label data for the given year
-        temp = f_temp.variables['t2m'][(year_event-year_beg)*92:(year_event-year_beg+1)*92,:,:]-273.15 #convert K to °C #load all JJA temperature anomaly data for the given year
+        temp = f_temp.variables['t2m'][(year_event-year_beg)*92:(year_event-year_beg+1)*92,:,:]
         if np.isnan(df_emdat.loc[idx,'Start Day']) :
             month_beg_event = int(df_emdat.loc[idx,'Start Month'])
             month_end_event = int(df_emdat.loc[idx,'End Month'])

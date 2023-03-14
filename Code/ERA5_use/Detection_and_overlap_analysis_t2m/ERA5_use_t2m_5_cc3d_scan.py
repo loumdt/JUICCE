@@ -77,7 +77,7 @@ nc_file_mask = os.path.join(datadir, "ERA5", "Mask", "Mask_Europe_1_ERA5_0.25deg
 f_mask=nc.Dataset(nc_file_mask,mode='r')
 Mask_0 = f_mask.variables['mask'][:]
 #%%
-nc_file_potential_htws = os.path.join(datadir , "ERA5" , "Detection_Canicule" , "potential_heatwaves_"+the_variable+"_"+str(nb_days)+"days_before_scan_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th.nc")
+nc_file_potential_htws = os.path.join(datadir , "ERA5" ,"t2m", "Detection_Canicule" , "potential_heatwaves_"+the_variable+"_"+str(nb_days)+"days_before_scan_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th.nc")
 
 f_pot_htws=nc.Dataset(nc_file_potential_htws, mode='r')
 date_format=f_pot_htws.variables['date_format'][:] #date as a string, yyyy-mm-dd format
@@ -89,7 +89,7 @@ for i in tqdm(range(len(date_format))) :
     date_format_readable_year_only[i] = (date_format_readable[i])[:4]
 #%%
 #define pathway to output netCDF file, no need to create directory.
-nc_out_path = os.path.join(datadir , "ERA5" , "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
+nc_out_path = os.path.join(datadir , "ERA5" ,"t2m", "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
 #Create output netCDF file
 nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') #mode='w' for 'write', 'a' for 'append'
 
@@ -182,7 +182,7 @@ elbow = False
 #%%
 #exit()
 #%%
-df_htw = pd.DataFrame(columns=['idx_beg_JJA','idx_end_JJA','idx_beg_1950','idx_end_1950'],index=unique_htw_cc3d_idx,data=None)
+df_htw = pd.DataFrame(columns=['Year','idx_beg_JJA','idx_end_JJA','idx_beg_1950','idx_end_1950'],index=unique_htw_cc3d_idx,data=None)
 #%%
 #-------------------------------#
 # Make animations for heatwaves #
@@ -216,7 +216,7 @@ pathlib.Path(output_dir_anim).mkdir(parents=True,exist_ok=True)
 #%%
 #############################################################
 #True for exporting mp4 animations of the detected heatwaves#
-run_animation = False                                       #
+run_animation = False
 #############################################################
 #%%
 for event in tqdm(unique_htw_cc3d_idx[:]):
@@ -229,6 +229,7 @@ for event in tqdm(unique_htw_cc3d_idx[:]):
     df_htw.loc[event,'idx_end_JJA'] = dates_JJA[-1]
     df_htw.loc[event,'idx_beg_1950'] = dates_1950[0]
     df_htw.loc[event,'idx_end_1950'] = dates_1950[-1]
+    df_htw.loc[event,'Year'] = int(year_beg+dates_JJA[0]//92) #year of the heatwave event
     #if event>0 :
     #    for i in range(len(all_time_idx)) :
     #        time_list = all_time_idx[i]
