@@ -16,8 +16,8 @@ import xarray as xr
 if __name__ == "__main__":
 	
 	## Parameters
-	pin  = os.path.join( os.environ["DATADIR"] , "ERA5-Land" , "t2m" , os.environ["YEAR"])
-	pout = os.path.join( os.environ["DATADIR"] , "ERA5-Land" , "t2m" , os.environ["YEAR"])
+	pin  = os.path.join( os.environ["DATADIR"] , "ERA5" , "z500" , os.environ["YEAR"])
+	pout = os.path.join( os.environ["DATADIR"] , "ERA5" , "z500" , os.environ["YEAR"])
 	
 	## List files
 	lfiles = os.listdir(pin)
@@ -44,12 +44,12 @@ if __name__ == "__main__":
 		lon = lon[ilon]
 		
 		## Reformat data
-		t2mh = xr.DataArray( idata.t2m.values[:,ilat,:][:,:,ilon] , dims = ["time","lat","lon"] , coords = [timeh,lat,lon] )
-		tnd = t2mh.groupby("time.dayofyear").min().rename( dayofyear = "time" ).assign_coords( time = timed )
+		z500h = xr.DataArray( idata.t2m.values[:,ilat,:][:,:,ilon] , dims = ["time","lat","lon"] , coords = [timeh,lat,lon] )
+		z500d = z500h.groupby("time.dayofyear").mean().rename( dayofyear = "time" ).assign_coords( time = timed )
 		
 		## Output
-		odatah = xr.Dataset( { "t2m" : t2mh } )
-		odatad = xr.Dataset( { "t2m" : tnd } )
+		odatah = xr.Dataset( { "z" : z500h } )
+		odatad = xr.Dataset( { "z" : z500d } )
 		
 		## Add attributes
 		odatah["time"].attrs["standard_name"] = "time"
@@ -80,17 +80,18 @@ if __name__ == "__main__":
 		odatad["lon"].attrs["units"]         = "degrees_east"
 		odatad["lon"].attrs["axis"]          = "X"
 		
-		odatah["t2m"].attrs["coordinates"]   = "lat lon"
-		odatah["t2m"].attrs["standard_name"] = "t2m"
-		odatah["t2m"].attrs["long_name"]     = "2m_temperature"
-		odatah["t2m"].attrs["units"]         = "K"
+		odatah["z"].attrs["coordinates"]   = "lat lon"
+		odatah["z"].attrs["standard_name"] = "z500"
+		odatah["z"].attrs["long_name"]     = "500 hPa geopotential"
+		odatah["z"].attrs["units"]         = "m**2.s**-2"
 		
-		odatad["t2m"].attrs["coordinates"]   = "lat lon"
-		odatad["t2m"].attrs["standard_name"] = "min_temperature"
-		odatad["t2m"].attrs["long_name"]     = "tn"
-		odatad["t2m"].attrs["units"]         = "K"
-		
-		product = 'reanalysis-era5-land'
+		odatad["z"].attrs["coordinates"]   = "lat lon"
+		odatad["z"].attrs["standard_name"] = "z500"
+		odatad["z"].attrs["long_name"]     = "500 hPa geopotential"
+		odatad["z"].attrs["units"]         = "m**2.s**-2"
+  
+
+		product = 'reanalysis-era5-pressure-levels'
 		
 		odatah.attrs["title"]         = "ERA5"
 		odatah.attrs["Conventions"]   = "CF-1.6"
@@ -110,28 +111,28 @@ if __name__ == "__main__":
 		encodingh = { "time" : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,) , "units" : "hours since 1850-01-01 00:00:00" } ,
 					  "lon"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (nx,) } ,
 					  "lat"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (ny,) } ,
-					  "t2m"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
+					  "z"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
 		encodingd = { "time" : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,) , "units" : "days since 1850-01-01 00:00:00" } ,
 					  "lon"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (nx,) } ,
 					  "lat"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (ny,) } ,
-					  "t2m"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
+					  "z"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
 		
 		## And now in netcdf
-		pouth = os.path.join( pout , "hour" , "tn" )
+		pouth = os.path.join( pout , "hour" , "z" )
 		if not os.path.isdir(pouth):
 			os.makedirs(pouth)
 		odatah.to_netcdf( os.path.join( pouth , f ) , encoding = encodingh )
 		
-		poutd = os.path.join( pout , "day" , "tn" )
+		poutd = os.path.join( pout , "day" , "z" )
 		if not os.path.isdir(poutd):
 			os.makedirs(poutd)
-		foutd = f"ERA5_Land_Europe_01deg_day_tn_{year}0101-{year}1231.nc"
+		foutd = f"ERA5_Land_Europe_01deg_day_t2m_{year}0101-{year}1231.nc"
 		odatad.to_netcdf( os.path.join( poutd , foutd ) , encoding = encodingd )
 	
 		del idata
 		del odatah
 		del odatad
-		del t2mh
-		del tnd
+		del z500h
+		del z500d
 	
 	print("Done")

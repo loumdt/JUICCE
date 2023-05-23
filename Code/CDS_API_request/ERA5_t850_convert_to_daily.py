@@ -16,8 +16,8 @@ import xarray as xr
 if __name__ == "__main__":
 	
 	## Parameters
-	pin  = os.path.join( os.environ["DATADIR"] , "ERA5-Land" , "t2m" , os.environ["YEAR"])
-	pout = os.path.join( os.environ["DATADIR"] , "ERA5-Land" , "t2m" , os.environ["YEAR"])
+	pin  = os.path.join( os.environ["DATADIR"] , "ERA5" , "t850" , os.environ["YEAR"])
+	pout = os.path.join( os.environ["DATADIR"] , "ERA5" , "t850" , os.environ["YEAR"])
 	
 	## List files
 	lfiles = os.listdir(pin)
@@ -44,12 +44,12 @@ if __name__ == "__main__":
 		lon = lon[ilon]
 		
 		## Reformat data
-		t2mh = xr.DataArray( idata.t2m.values[:,ilat,:][:,:,ilon] , dims = ["time","lat","lon"] , coords = [timeh,lat,lon] )
-		txd = t2mh.groupby("time.dayofyear").max().rename( dayofyear = "time" ).assign_coords( time = timed )
+		t850h = xr.DataArray( idata.t.values[:,ilat,:][:,:,ilon] , dims = ["time","lat","lon"] , coords = [timeh,lat,lon] )
+		t850d = t850h.groupby("time.dayofyear").mean().rename( dayofyear = "time" ).assign_coords( time = timed )
 		
 		## Output
-		odatah = xr.Dataset( { "t2m" : t2mh } )
-		odatad = xr.Dataset( { "t2m" : txd } )
+		odatah = xr.Dataset( { "t850" : t850h } )
+		odatad = xr.Dataset( { "t850" : t850d } )
 		
 		## Add attributes
 		odatah["time"].attrs["standard_name"] = "time"
@@ -80,17 +80,18 @@ if __name__ == "__main__":
 		odatad["lon"].attrs["units"]         = "degrees_east"
 		odatad["lon"].attrs["axis"]          = "X"
 		
-		odatah["t2m"].attrs["coordinates"]   = "lat lon"
-		odatah["t2m"].attrs["standard_name"] = "t2m"
-		odatah["t2m"].attrs["long_name"]     = "2m_temperature"
-		odatah["t2m"].attrs["units"]         = "K"
+		odatah["t850"].attrs["coordinates"]   = "lat lon"
+		odatah["t850"].attrs["standard_name"] = "t850"
+		odatah["t850"].attrs["long_name"]     = "850 hPa temperature"
+		odatah["t850"].attrs["units"]         = "K"
 		
-		odatad["t2m"].attrs["coordinates"]   = "lat lon"
-		odatad["t2m"].attrs["standard_name"] = "max_temperature"
-		odatad["t2m"].attrs["long_name"]     = "tx"
-		odatad["t2m"].attrs["units"]         = "K"
-		
-		product = 'reanalysis-era5-land'
+		odatad["t850"].attrs["coordinates"]   = "lat lon"
+		odatad["t850"].attrs["standard_name"] = "t850"
+		odatad["t850"].attrs["long_name"]     = "850 hPa temperature"
+		odatad["t850"].attrs["units"]         = "K"
+  
+
+		product = 'reanalysis-era5-pressure-levels'
 		
 		odatah.attrs["title"]         = "ERA5"
 		odatah.attrs["Conventions"]   = "CF-1.6"
@@ -110,28 +111,28 @@ if __name__ == "__main__":
 		encodingh = { "time" : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,) , "units" : "hours since 1850-01-01 00:00:00" } ,
 					  "lon"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (nx,) } ,
 					  "lat"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (ny,) } ,
-					  "t2m"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
+					  "t850"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
 		encodingd = { "time" : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,) , "units" : "days since 1850-01-01 00:00:00" } ,
 					  "lon"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (nx,) } ,
 					  "lat"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (ny,) } ,
-					  "t2m"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
+					  "t850"  : { "dtype" : "float32" , "zlib" : True , "complevel": 5 , "chunksizes" : (1,ny,nx) } }
 		
 		## And now in netcdf
-		pouth = os.path.join( pout , "hour" , "tx" )
+		pouth = pout
 		if not os.path.isdir(pouth):
 			os.makedirs(pouth)
 		odatah.to_netcdf( os.path.join( pouth , f ) , encoding = encodingh )
 		
-		poutd = os.path.join( pout , "day" , "tx" )
+		poutd = pout
 		if not os.path.isdir(poutd):
 			os.makedirs(poutd)
-		foutd = f"ERA5_Land_Europe_01deg_day_tx_{year}0101-{year}1231.nc"
+		foutd = f"ERA5_Europe_025deg_day_t850_{year}0101-{year}1231.nc"
 		odatad.to_netcdf( os.path.join( poutd , foutd ) , encoding = encodingd )
 	
 		del idata
 		del odatah
 		del odatad
-		del t2mh
-		del txd
+		del t850h
+		del t850d
 	
 	print("Done")
