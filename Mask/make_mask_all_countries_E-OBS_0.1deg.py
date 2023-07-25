@@ -29,9 +29,9 @@ list_countries = ['Albania','Austria','Belarus','Belgium','Bosnia and Herzegovin
 'Switzerland','Turkey','Ukraine','United Kingdom']
 #-------------------
 
-nc_file_mask="/d/Ubuntu/These/JUICCE/Data/E-OBS/Mask/Mask_Europe_E-OBS_0.1deg.nc"
+nc_file_mask="Data/E-OBS/Mask/Mask_Europe_E-OBS_0.1deg.nc"
 f_mask=nc.Dataset(nc_file_mask,mode='r')
-mask_all=f_mask.variables['mask_all'][:]
+mask_all=f_mask.variables['mask'][:]
 #-----------------------------------
 
 def rect_from_bound(xmin, xmax, ymin, ymax):
@@ -63,9 +63,11 @@ for idx_country in range(len(list_countries)) :
         country2= 'Serbia'
     elif country == 'North Macedonia':
         country2= 'Macedonia'
+    elif country == 'Bosnia and Herzegovina':
+        country2= 'Bosnia_and_Herzegovina'
 
     #Define netCDF output file :
-    nc_file_out = nc.Dataset("/d/Ubuntu/These/JUICCE/Data/E-OBS/Mask/mask_"+country2+"_E-OBS_0.1deg.nc",mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
+    nc_file_out = nc.Dataset("Data/E-OBS/Mask/mask_"+country2+"_E-OBS_0.1deg.nc",mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
     lat_dim = nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
     lon_dim = nc_file_out.createDimension('lon', len(lon_in))    # longitude axis
 
@@ -79,7 +81,7 @@ for idx_country in range(len(list_countries)) :
     lon.units = 'degrees_east'
     lon.long_name = 'longitude'
     # Define a 3D variable to hold the data
-    mask_country = nc_file_out.createVariable('mask_'+country2,np.float32,('lat','lon')) # note: unlimited dimension is leftmost
+    mask_country = nc_file_out.createVariable('mask',np.float32,('lat','lon')) # note: unlimited dimension is leftmost
     mask_country.long_name = '1 when masked, else 0. All countries are masked except '+country
     # Note: the ":" is necessary in these "write" statements
     lat[:] = lat_in[:] 

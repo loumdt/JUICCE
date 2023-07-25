@@ -1,6 +1,8 @@
 Data/*
 !Data/E-OBS/Mask/make_mask_Europe_E-OBS_0.1deg.py
 !Data/E-OBS/Mask/Mask_Europe_E-OBS_0.1deg.nc
+!Data/GDIS_EM-DAT/EMDAT_Europe-1950-2022-heatwaves.xlsx
+!Data/GDIS_EM-DAT/Lucy_Hammond_ETE_data_V2.xlsx
 Code/Mask/*.png
 Mask/*.png
 *.mp4

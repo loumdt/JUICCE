@@ -9,6 +9,7 @@ from shapely.geometry import Point
 from cartopy.io import shapereader
 import geopandas
 import os
+import pathlib
 #%%
 #PC or spirit server?
 if os.name == 'nt' :
@@ -18,7 +19,7 @@ else :
 #%%
 #Load netcdf temperature data file :
 nc_in_path = os.path.join(datadir,"ERA5","t2m","ERA5_tg_Europe_day_0.25deg_1950-2021.nc") # path to ERA5 data netCDF file
-print('nc_file_in',nc_in_path)
+
 f=nc.Dataset(nc_in_path, mode='r') #load file
 lat_in=f.variables['lat'][:] #load dimensions
 lon_in=f.variables['lon'][:]
@@ -28,7 +29,7 @@ lon_table=np.array([lon_in]*len(lat_in))
 #%%
 #Load ERA5 land density file :
 nc_land_density_path = os.path.join(datadir,"ERA5","Mask","land_sea_mask_ERA5_0.25deg.nc") # path to ERA5 data netCDF file
-print('nc_land_density_path',nc_land_density_path)
+
 f_density=nc.Dataset(nc_land_density_path, mode='r') #load file
 land_density = f_density.variables['land_density'][0,::-1,:]
 
@@ -54,8 +55,10 @@ shpfilename = shapereader.natural_earth(resolution, category, name)
 df = geopandas.read_file(shpfilename)
 #%%
 #-----------------------------------
+output_dir = os.path.join(datadir,"ERA5","Mask")
+pathlib.Path(output_dir).mkdir(parents=True,exist_ok=True)
 for country in list_countries :
-    print(country)
+    #print(country)
     if country == 'United Kingdom':#fix issues of spaces in filenames
         country2 = 'United_Kingdom'
     elif country == 'Republic of Serbia':
@@ -65,8 +68,8 @@ for country in list_countries :
     else :
         country2 = country
     #Mask Africa and Middle-East
-    nc_out_name = os.path.join(datadir,"ERA5","Mask","Mask_"+country2+"_ERA5_0.25deg.nc") #path to the output netCDF file
-    nc_file_out=nc.Dataset(nc_out_name,mode='w',format='NETCDF4_CLASSIC') 
+    nc_out_path = os.path.join(output_dir,"Mask_"+country2+"_ERA5_0.25deg.nc") #path to the output netCDF file
+    nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') 
     #Define netCDF output file :
     lat_dim = nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
     lon_dim = nc_file_out.createDimension('lon', len(lon_in))    # longitude axis

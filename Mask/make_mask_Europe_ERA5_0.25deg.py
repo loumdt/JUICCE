@@ -9,6 +9,7 @@ from shapely.geometry import Point
 from cartopy.io import shapereader
 import geopandas
 import os
+import pathlib
 #%%
 #PC or spirit server?
 if os.name == 'nt' :
@@ -18,7 +19,7 @@ else :
 #%%
 #Load netcdf temperature data file :
 nc_in_path = os.path.join(datadir,"ERA5","t2m","ERA5_tg_Europe_day_0.25deg_1950-2021.nc") # path to ERA5 data netCDF file
-print('nc_file_in',nc_in_path)
+
 f=nc.Dataset(nc_in_path, mode='r') #load file
 lat_in=f.variables['lat'][:] #load dimensions
 lon_in=f.variables['lon'][:]
@@ -28,13 +29,15 @@ lon_table=np.array([lon_in]*len(lat_in))
 #%%
 #Load ERA5 land density file :
 nc_land_density_path = os.path.join(datadir,"ERA5","Mask","land_sea_mask_ERA5_0.25deg.nc") # path to ERA5 data netCDF file
-print('nc_land_density_path',nc_land_density_path)
+
 f_density=nc.Dataset(nc_land_density_path, mode='r') #load file
 land_density = f_density.variables['land_density'][0,::-1,:]
 #%%
 #Mask Africa and Middle-East
-nc_out_name = os.path.join(datadir,"ERA5","Mask","Mask_Europe_1_ERA5_0.25deg.nc") #path to the output netCDF file
-nc_file_out=nc.Dataset(nc_out_name,mode='w',format='NETCDF4_CLASSIC') 
+output_dir = os.path.join(datadir,"ERA5","Mask")
+pathlib.Path(output_dir).mkdir(parents=True,exist_ok=True)
+nc_out_path = os.path.join(output_dir,"Mask_Europe_1_ERA5_0.25deg.nc") #path to the output netCDF file
+nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') 
 #Define netCDF output file :
 lat_dim = nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
 lon_dim = nc_file_out.createDimension('lon', len(lon_in))    # longitude axis
@@ -53,7 +56,7 @@ mask.long_name = 'Africa and Middle-East are masked but not ocean'
 
 #%%
 #Mask Africa and Middle-East and ocean and sea
-nc_out_name_all = os.path.join(datadir,"ERA5","Mask","Mask_Europe_land_only_ERA5_0.25deg.nc") #path to the output netCDF file
+nc_out_name_all = os.path.join(output_dir,"Mask_Europe_land_only_ERA5_0.25deg.nc") #path to the output netCDF file
 nc_file_out_all=nc.Dataset(nc_out_name_all,mode='w',format='NETCDF4_CLASSIC') 
 #Define netCDF output file :
 lat_dim = nc_file_out_all.createDimension('lat', len(lat_in))    # latitude axis
@@ -99,7 +102,7 @@ df = geopandas.read_file(shpfilename)
 #%%
 #-----------------------------------
 for country in list_countries :
-    print(country)
+    #print(country)
     # get geometry of a country
     poly = [df.loc[df['ADMIN'] == country]['geometry'].values[0]]
     # create fig and axes using intended projection

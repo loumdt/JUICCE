@@ -37,14 +37,14 @@ lon = nc_file_out.createVariable('lon', np.float32, ('lon',))
 lon.units = 'degrees_east'
 lon.long_name = 'longitude'
 # Define a 3D variable to hold the data
-mask_all = nc_file_out.createVariable('mask_all',np.int32,('lat','lon')) # note: unlimited dimension is leftmost
-mask_all.long_name = 'Africa is masked as well as ocean'
+mask_all = nc_file_out.createVariable('mask',np.int32,('lat','lon')) # note: unlimited dimension is leftmost
+mask_all.long_name = 'mask for Europe'
 
 # Note: the ":" is necessary in these "write" statements
 lat[:] = lat_in[:] 
 lon[:] = lon_in[:]
 
-mask_all[:,:]=f.variables['tg'][13500,:,:].mask #this mask happens to be quite good, 13500 days from 01 jan 1950
+mask_all[:,:]=f.variables['tg'][19000,:,:].mask #this mask happens to be quite good, 13500 days from 01 jan 1950
 #%%
 
 mask_all[:,:] = mask_all[:,:] + (lat_table<33.5)*(lon_table>-13.07) #The most southern point of Europe is at 34.0°N
