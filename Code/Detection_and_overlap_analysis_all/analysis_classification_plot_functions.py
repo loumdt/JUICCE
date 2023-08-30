@@ -425,7 +425,7 @@ def compute_heatwaves_metrics_scores(database='ERA5', datavar='t2m', daily_var='
                 plt.legend()
                 plt.savefig(os.path.join(figs_output_dir,f"roc_curve_{chosen_meteo}.png"))
                 plt.close()
-    df_scores.to_excel(os.path.join(dataframe_dir,f"df_scores_{'count_all_impacts'*(count_all_impacts)}_flex_time_span_{flex_time_span}_days.xlsx"))
+    df_scores.to_excel(os.path.join(dataframe_dir,f"df_scores{'_count_all_impacts'*(count_all_impacts)}_flex_time_span_{flex_time_span}_days.xlsx"))
     return
 
 #%%
@@ -718,11 +718,5 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
         hammond_deaths = np.sum([df_impact_alternate.loc[index,'Deaths'] for index in overlap_list])
         output_overlap_df.loc[htw_id]=[year_event,df_htw.loc[htw_id,'idx_beg_JJA'],df_htw.loc[htw_id,'idx_end_JJA'],start_date_idx_all_year,end_date_idx_all_year,[inv_dict_country_labels[country] for country in affected_countries_labels_dict[htw_id]],overlap_list,hammond_affected_countries,hammond_deaths]
         
-    output_overlap_df.to_excel(os.path.join(output_dir_df,f"top_{nb_top_events}_events_overlap_{'_count_all_impacts'*count_all_impacts}_flex_time_{flex_time_span}days.xlsx"))
-
-    #with open(os.path.join(output_dir_df,f"top_unrecorded_heatwaves_{database}_{datavar}_{daily_var}_ano_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_ds.txt"), 'w') as output :
-    #    for k,v in overlap_list_dict.items() :
-    #        output.write(str(k) + ' ' + str(v) + ' ' + str([inv_dict_country_labels[country] for country in affected_countries_labels_dict[k]]) + '\n') #*(len(v)>0)
-            
-    #faire plutôt un dataframe avec ces infos + récupérer ce qui overlap avec le doc Lucy Hammond pour avoir toutes les infos d'un coup
+    output_overlap_df.to_excel(os.path.join(output_dir_df,f"top_{nb_top_events}_events_overlap{'_count_all_impacts'*count_all_impacts}_flex_time_{flex_time_span}days.xlsx"))
     return
