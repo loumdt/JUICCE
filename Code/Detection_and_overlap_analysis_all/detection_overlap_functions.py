@@ -13,24 +13,18 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import cartopy.crs as ccrs 
 import cartopy.feature as cfeature 
+from shapely.geometry import Polygon
+from shapely.geometry import Point
+from cartopy.io import shapereader
+import geopandas
 
 
 #%%
-def compute_climatology_smooth(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021,historical_climatology=False,year_beg_later=False):
+def compute_climatology_smooth(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021,year_beg_climatology=1950, year_end_climatology=2021):
     '''This function computes a climatology for each calendar day of the year. The seasonal cycle is then smoothed with a 31-day window. 
-    By default, the climatology is computed over the studied period (default 1950-2021), but if historical_climatology is True, the climatology is computed only for the 1950-1980 period.
-    This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m). If the studied period starts later than the beginning of the climatology period, set year_beg_later on True. 
-    For instance, if studied period is 1990-2020 and climatology period is 1950-1980, these parameters should be set such as : year_beg=1990, year_end=2020, historical_climatology=True, year_beg_later=True.'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
-
+    By default, the climatology is computed over the studied period (default 1950-2021).
+    This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m). 
+    For instance, if studied period is 1990-2020 and climatology period is 1950-1980, these parameters should be set such as : year_beg=1990, year_end=2020, year_beg_climatology=1950, year_end_climatology=1980 '''
     print('database :',database)
     print('datavar :',datavar)
     print('daily_var :',daily_var)
@@ -73,7 +67,7 @@ def compute_climatology_smooth(database='ERA5', datavar='t2m', daily_var='tg', y
     nc_file_out.createDimension('time', None) # unlimited axis (can be appended to).
 
     nc_file_out.title=f"Climatology of daily {temp_name_dict[daily_var]} {datavar}, averaged over {year_beg_climatology}-{year_end_climatology} for every day of the year, and smoothed to eliminate variability."
-    nc_file_out.history = "Created with file run_all_detection_and_overlap_analysis.py on " + datetime.today().strftime("%d/%m/%y")
+    nc_file_out.history = "Created with file run_all_detection_overlap_analysis.py on " + datetime.today().strftime("%d/%m/%y")
 
     lat = nc_file_out.createVariable('lat', np.float32, ('lat',))
     lat.units = 'degrees_north'
@@ -156,22 +150,13 @@ def compute_climatology_smooth(database='ERA5', datavar='t2m', daily_var='tg', y
     return
 
 #%%
-def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, historical_climatology=False, year_beg_later=False, threshold_window_size=15):
+def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15):
     '''This function computes, for every calendar day, the n-th (n is the threshold_value, default 95) percentile of the corresponding distribution of daily. 
-    By default, the distribution is computed over the studied period (default 1950-2021), but if historical_climatology is True, the distribution is computed only for the 1950-1980 period.
+    By default, the distribution is computed over the default studied period (1950-2021).
     This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m)'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-        
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
-    
-    if threshold_window_size%2==0:
-        raise ValueError('threshold_window_size is even. It has to be odd so the window can be centered on the computed day.')
+
+    if distrib_window_size%2==0:
+        raise ValueError('distrib_window_size is even. It has to be odd so the window can be centered on the computed day.')
         
     print('database :',database)
     print('datavar :',datavar)
@@ -181,7 +166,7 @@ def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg
     print('threshold_value :',threshold_value)
     print('year_beg_climatolgy :',year_beg_climatology)
     print('year_end_climatolgy :',year_end_climatology)
-    print('threshold_window_size :',threshold_window_size)
+    print('distrib_window_size :',distrib_window_size)
 
     if os.name == 'nt' :
         datadir = "Data/"
@@ -204,8 +189,8 @@ def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg
     T_mean_ano[0:-10,:,:]=f_mean.variables[datavar][:,:,:]
     T_mean_ano[-10:,:,:]=f_mean.variables[datavar][0:10,:,:]
 
-    #path to output netCDF file, no need to check the existence of parents directory, already created in previous script
-    nc_out_path = os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{threshold_value}th_threshold_{threshold_window_size}days.nc")
+    #path to output netCDF file, no need to check the existence of parents directory, already created in previous function
+    nc_out_path = os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{threshold_value}th_threshold_{distrib_window_size}days.nc")
     nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
     #-----------
     #Define netCDF output file :
@@ -213,7 +198,7 @@ def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg
     nc_file_out.createDimension('lon', len(lon_in))    # longitude axis
     nc_file_out.createDimension('time', None) # unlimited axis (can be appended to).
 
-    nc_file_out.title=f"{threshold_value}th percentile of the {temp_name_dict[daily_var]} {datavar} anomaly distribution, for each location, and calendar day (with a {threshold_window_size}-day centered window). Computed for {year_beg_climatology}-{year_end_climatology}period."
+    nc_file_out.title=f"{threshold_value}th percentile of the {temp_name_dict[daily_var]} {datavar} anomaly distribution, for each location, and calendar day (with a {distrib_window_size}-day centered window). Computed for {year_beg_climatology}-{year_end_climatology}period."
     nc_file_out.history = "Created with file run_all_detection_overlap_analysis.py on " + datetime.today().strftime("%d/%m/%y")
 
     lat = nc_file_out.createVariable('lat', np.float32, ('lat',))
@@ -255,36 +240,36 @@ def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg
         threshold[day_of_the_year,:,:]=f.variables[datavar][day_of_the_year,:,:] 
         if day_of_the_year==59: #29th February
             for i in bis_years:
-                for j in range(-(threshold_window_size//2),threshold_window_size//2+1,1):
+                for j in range(-(distrib_window_size//2),distrib_window_size//2+1,1):
                     list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
         elif day_of_the_year<59:#before 29th Feb, no issues
             i=0
-            for j in range(np.max([-day_of_the_year,-(threshold_window_size//2)]),threshold_window_size//2+1,1):
+            for j in range(np.max([-day_of_the_year,-(distrib_window_size//2)]),distrib_window_size//2+1,1):
                     list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
             for i in range(len(df_bis_year)-1):
-                for j in range(-(threshold_window_size//2),threshold_window_size//2+1,1):
+                for j in range(-(distrib_window_size//2),distrib_window_size//2+1,1):
                     list_table.append(f.variables[datavar][idx_start_year[i+1]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
                     
         else: #After 29th Feb, have to distinguish bisextile and non-bisextile years
             if last_year_is_bis : #if the last year of the period is a leap year
                 for i in not_bis_years:
-                    for j in range(-(threshold_window_size//2),threshold_window_size//2+1,1):
+                    for j in range(-(distrib_window_size//2),distrib_window_size//2+1,1):
                         list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year-1+j,:,:]-T_mean_ano[day_of_the_year-1+j,:,:])
                 for i in bis_years[:-1]:
-                    for j in range(-(threshold_window_size//2),threshold_window_size//2+1,1):
+                    for j in range(-(distrib_window_size//2),distrib_window_size//2+1,1):
                         list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
                 i = bis_years[-1]
-                for j in range(-(threshold_window_size//2),np.min([threshold_window_size//2+1,365-day_of_the_year]),1):
+                for j in range(-(distrib_window_size//2),np.min([distrib_window_size//2+1,365-day_of_the_year]),1):
                         list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
             else : #if the last year of the period is not a leap year
                 for i in not_bis_years[:-1]:
-                    for j in range(-(threshold_window_size//2),threshold_window_size//2+1,1):
+                    for j in range(-(distrib_window_size//2),distrib_window_size//2+1,1):
                         list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year-1+j,:,:]-T_mean_ano[day_of_the_year-1+j,:,:])
                 for i in bis_years:
-                    for j in range(-(threshold_window_size//2),threshold_window_size//2+1,1):
+                    for j in range(-(distrib_window_size//2),distrib_window_size//2+1,1):
                         list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
                 i = not_bis_years[-1]
-                for j in range(-(threshold_window_size//2),np.min([threshold_window_size//2+1,365-day_of_the_year]),1):
+                for j in range(-(distrib_window_size//2),np.min([distrib_window_size//2+1,365-day_of_the_year]),1):
                         list_table.append(f.variables[datavar][idx_start_year[i]+day_of_the_year+j,:,:]-T_mean_ano[day_of_the_year+j,:,:])
         threshold[day_of_the_year,:,:]=ma.array(np.percentile(list_table[:],threshold_value,axis=0),mask=False)
         
@@ -295,19 +280,10 @@ def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg
     return
 
 #%%
-def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, historical_climatology=False, year_beg_later=False, threshold_window_size=15):
+def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15):
     '''This function creates a netCDF file with daily min, mean or max temperature (or climate comfort index) anomaly for concatenated JJAs for the chosen period (default 1950-2021) when and where the n-th (default 95th) percentile threshold of the climatology distribution is exceeded ; 
     Otherwise, values are set to -9999.
     This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m)'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-        
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
 
     print('database :',database)
     print('datavar :',datavar)
@@ -335,13 +311,13 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     lon_in=f.variables['lon'][:]
     #-------------------------------------
     #Load average climatology temperature file
-    nc_file_anomaly=os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_daily_avg_{year_beg_climatology}_{year_end_climatology}_smoothed.nc")  #path to the netCDF climatology file
-    f_anomaly=nc.Dataset(nc_file_anomaly, mode='r') 
-    T_mean=f_anomaly.variables[datavar][152:244,:,:]
+    nc_file_climatology_mean=os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_daily_avg_{year_beg_climatology}_{year_end_climatology}_smoothed.nc")  #path to the netCDF climatology file
+    f_climatology_mean=nc.Dataset(nc_file_climatology_mean, mode='r') 
+    T_mean=f_climatology_mean.variables[datavar][152:244,:,:]
     #-------------------------------------
     #Only record the JJA temperatures and REMOVE the values that do not exceed the n-th (default 95th) percentile threshold
     #No need to create directory, already created in previous scripts
-    nc_out_name = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_out_name = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     nc_file_out=nc.Dataset(nc_out_name,mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
     #Define netCDF output file :
     nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
@@ -349,8 +325,8 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     nc_file_out.createDimension('time', 92*(year_end-year_beg+1)) # unlimited time axis (can be appended to).
 
     nc_file_out.title=f"Daily {temp_name_dict[daily_var]} {datavar} anomaly for JJA days from {year_beg} to {year_end}"
-    nc_file_out.subtitle=f"values put to zero where not exceeding {threshold_value}th {datavar} anomaly threshold. This threshold was computed over the {year_beg_climatology}-{year_end_climatology} climatology, with a {threshold_window_size} days window."
-    nc_file_out.history = "Created with run_all_detection_and_overlap_analysis.py on " +datetime.today().strftime("%d/%m/%y")
+    nc_file_out.subtitle=f"values put to zero where not exceeding {threshold_value}th {datavar} anomaly threshold. This threshold was computed over the {year_beg_climatology}-{year_end_climatology} climatology, with a {distrib_window_size} days window."
+    nc_file_out.history = "Created with run_all_detection_overlap_analysis.py on " +datetime.today().strftime("%d/%m/%y")
 
     lat = nc_file_out.createVariable('lat', np.float32, ('lat',))
     lat.units = 'degrees_north'
@@ -371,7 +347,7 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     output_var.long_name = long_name_dict[datavar]
     #-----------
     #Only record the JJA temperatures and KEEP the values that do not exceed the n-th (default 95th) percentile threshold
-    nc_out_not_scaled_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{threshold_window_size}days.nc")#path to the output netCDF file
+    nc_out_not_scaled_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc")#path to the output netCDF file
     nc_file_out_not_scaled=nc.Dataset(nc_out_not_scaled_path,mode='w',format='NETCDF4_CLASSIC') 
     #Define netCDF output file :
     nc_file_out_not_scaled.createDimension('lat', len(lat_in))    # latitude axis
@@ -379,7 +355,7 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     nc_file_out_not_scaled.createDimension('time', 92*(year_end-year_beg+1)) # unlimited time axis (can be appended to).
 
     nc_file_out_not_scaled.title=f"Daily {temp_name_dict[daily_var]} {datavar} anomaly for JJA days from {year_beg} to {year_end}"
-    nc_file_out_not_scaled.history = "Created with ano_scale_jja_selec.py on " +datetime.today().strftime("%d/%m/%y")
+    nc_file_out_not_scaled.history = "Created with run_all_detection_overlap_analysis.py on " +datetime.today().strftime("%d/%m/%y")
 
     lat_not_scaled = nc_file_out_not_scaled.createVariable('lat', np.float32, ('lat',))
     lat_not_scaled.units = 'degrees_north'
@@ -404,7 +380,7 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     df_bis_year = df_bis_year.loc[year_beg:year_end,:]
     idx_start_year = np.array(df_bis_year.loc[:,"Idx_start"].values) #index of 1st january for each year
     #-------------------------------------
-    f_threshold_name = os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{threshold_value}th_threshold_{threshold_window_size}days.nc")
+    f_threshold_name = os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{threshold_value}th_threshold_{distrib_window_size}days.nc")
     f_threshold = nc.Dataset(f_threshold_name, mode='r')
     threshold_table = f_threshold.variables['threshold'][:]
     threshold_table=ma.masked_outside(threshold_table[152:244,:,:],-300,400) #threshold of n-th (default 95th) temperature anomaly percentile for every day of JJA and location
@@ -426,8 +402,8 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     for i in tqdm(range(year_end-year_beg+1)) :
         bis_year_flag=(1-(df_bis_year.loc[i+year_beg,'Nb_days']-365)) #flag put to one for non leap years and to zero for leap years
         for j in range(92):#92 days of JJA for each year i
-            output_var[92*i+j,:,:]=ma.array(f.variables[datavar][idx_start_year[i]+152-bis_year_flag+j,:,:]-273.15 -T_mean[j,:,:])
-            output_var_not_scaled[92*i+j,:,:]=ma.array(f.variables[datavar][idx_start_year[i]+152-bis_year_flag+j,:,:]-273.15 -T_mean[j,:,:])
+            output_var[92*i+j,:,:]=ma.array(f.variables[datavar][idx_start_year[i]+152-bis_year_flag+j,:,:] - T_mean[j,:,:])
+            output_var_not_scaled[92*i+j,:,:]=ma.array(f.variables[datavar][idx_start_year[i]+152-bis_year_flag+j,:,:] - T_mean[j,:,:])
         ano_scale = np.zeros(np.shape(output_var[i*92:(i+1)*92,:,:]))
         ano_scale = output_var[i*92:(i+1)*92,:,:] - threshold_table
         ano_scale_bool = (ano_scale <0) #array for the mask : when condition is True, the n-th percentile is not exceeded, value should be masked
@@ -438,25 +414,16 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
 
     f.close()
     nc_file_out.close()
-    f_anomaly.close()
+    f_climatology_mean.close()
     nc_file_out_not_scaled.close()
     f_threshold.close()
     return
 
 #%%
-def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, historical_climatology=False, year_beg_later=False, threshold_window_size=15,nb_days=4):
+def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4):
     '''This function deletes the temperature anomaly data if it is not strictly positive for at least the given number of consecutive days (default value is 4 days). Since it is meant to be used on the output of select_ano_scale_jja, "strictly positive" means that the value exceeds the threshold_value percentile of the climatology distribution.
     Otherwise, values are set to -9999.
     This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m)'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-        
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
 
     print('database :',database)
     print('datavar :',datavar)
@@ -478,13 +445,13 @@ def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', y
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
     
-    nc_in_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")   
+    nc_in_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")   
     f=nc.Dataset(nc_in_path, mode='r')
     lat_in=f.variables['lat'][:]
     lon_in=f.variables['lon'][:]
     time_in=f.variables['time'][:]
     #-------------------
-    nc_out_path = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_out_path = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     pathlib.Path(nc_out_path).parents[0].mkdir(parents=True, exist_ok=True) #create output directory and parent directories if necessary
     nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
 
@@ -494,8 +461,8 @@ def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', y
     nc_file_out.createDimension('time', None) # unlimited time axis (can be appended to).
     nc_file_out.createDimension('nchar', 10) #in order to save dates on date format as strings
 
-    nc_file_out.title=f"Daily {temp_name_dict[daily_var]} {datavar} anomaly for JJA days corresponding to a potential heatwave duration (here {nb_days} days), from {year_beg} to {year_end}. The threshold is the {threshold_value}th percentile of the climatology distribution ({year_beg_climatology}-{year_end_climatology}, {threshold_window_size}-days centered window)."
-    nc_file_out.subtitle=f"values are masked where and when not exceeding {threshold_value}th temperature anomaly threshold for {nb_days} consecutive days or more. Created with run_all_detection_and_overlap_analysis.py on "+ datetime.today().strftime("%d/%m/%y")
+    nc_file_out.title=f"Daily {temp_name_dict[daily_var]} {datavar} anomaly for JJA days corresponding to a potential heatwave duration (here {nb_days} days), from {year_beg} to {year_end}. The threshold is the {threshold_value}th percentile of the climatology distribution ({year_beg_climatology}-{year_end_climatology}, {distrib_window_size}-days centered window)."
+    nc_file_out.subtitle=f"values are masked where and when not exceeding {threshold_value}th temperature anomaly threshold for {nb_days} consecutive days or more. Created with run_all_detection_overlap_analysis.py on "+ datetime.today().strftime("%d/%m/%y")
 
     lat = nc_file_out.createVariable('lat', np.float32, ('lat',))
     lat.units = 'degrees_north'
@@ -512,7 +479,7 @@ def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', y
     output_var.standard_name = datavar # this is a CF standard name
 
     date_idx = nc_file_out.createVariable('date_idx', np.int32,('time',))
-    date_idx.units = f'days of JJA containing a sub-heatwave from {year_beg} to {year_end}, recorded as the matching index of the file {database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc'
+    date_idx.units = f'days of JJA containing a sub-heatwave from {year_beg} to {year_end}, recorded as the matching index of the file {database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc'
     date_idx.long_name = 'date_index'
     date_idx_all_year = nc_file_out.createVariable('date_idx_all_year', np.int32,('time',))
     date_idx_all_year.units = f'days from 01-01-{year_beg}'
@@ -564,19 +531,12 @@ def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', y
     nc_file_out.close()
     
 #%%
-def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, historical_climatology=False, year_beg_later=False, threshold_window_size=15,nb_days=4,run_animation=True):
-    '''This function deletes
+def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,run_animation=True):
+    '''This function carries out a cc3d scan (https://pypi.org/project/connected-components-3d/) to detect heatwaves in the meteorological database (default ERA5, t2m, tg).
+    The heatwaves point are labeled with a number corresponding to a heatwave identifier.
     Otherwise, values are set to -9999.
-    This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m)'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-        
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
+    The detection threshold depends on the parameters used precedently, which is why all the above parameters are required.
+    This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m).'''
 
     print('database :',database)
     print('datavar :',datavar)
@@ -594,12 +554,11 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
         datadir = os.environ["DATADIR"]
     
     temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
-    long_name_dict = {'utci' : 'Universal Thermal Climate Index', 't2m' : '2 meters temperature', 'wbgt':'Wet Bulb Globe Temperature (Brimicombe et al., 2023)'}
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
     #-------------------------------------
     #define pathway to temperature data
-    nc_in_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_in_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     #Load temperature data file
     f=nc.Dataset(nc_in_path, mode='r')#load input file dimensions/variables
     lat_in=f.variables['lat'][:]
@@ -616,7 +575,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     nc_file_mask = os.path.join(datadir,database,"Mask",f"Mask_Europe_1_{database}_{resolution}deg.nc")#file to load the corrected mask for all Europe
     f_mask=nc.Dataset(nc_file_mask,mode='r')
     Mask_0 = f_mask.variables['mask'][:]
-    nc_file_potential_htws = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_file_potential_htws = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
 
     f_pot_htws=nc.Dataset(nc_file_potential_htws, mode='r')
     date_format=f_pot_htws.variables['date_format'][:] #date as a string, yyyy-mm-dd format
@@ -627,7 +586,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
         date_format_readable[i] = "".join(date_format[:].astype(str).data[i])
         date_format_readable_year_only[i] = (date_format_readable[i])[:4]
     #define pathway to output netCDF file, no need to create directory.
-    nc_out_path = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_out_path = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     #Create output netCDF file
     nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') #mode='w' for 'write', 'a' for 'append'
 
@@ -638,8 +597,8 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
 
     #Output file title and history for more detailed information (not necessary)
     nc_file_out.title=f"Labels of CC3D for {temp_name_dict[daily_var]} {datavar} anomaly for JJA days from {year_beg} to {year_end}"
-    nc_file_out.subtitle=f"values are set to zero not exceeding {threshold_value}th {datavar} anomaly threshold, and labels are assigned to contiguous elements. The threshold is the {threshold_value}th percentile of the climatology distribution ({year_beg_climatology}-{year_end_climatology}, {threshold_window_size}-days centered window)." 
-    nc_file_out.history = "Created with ano_scale_jja_selec.py on " +datetime.today().strftime("%d/%m/%y")
+    nc_file_out.subtitle=f"values are set to zero not exceeding {threshold_value}th {datavar} anomaly threshold, and labels are assigned to contiguous elements. The threshold is the {threshold_value}th percentile of the climatology distribution ({year_beg_climatology}-{year_end_climatology}, {distrib_window_size}-days centered window)." 
+    nc_file_out.history = "Created with run_all_detection_overlap_analysis.py on " +datetime.today().strftime("%d/%m/%y")
 
     #Create output file variables
     # variable = nc_file_out.createVariable('variable_name',format, (dimensions))
@@ -660,7 +619,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     label.long_name = 'cc3d_label'
 
     #note : the [:] statements are necessary in these following statements. 
-    # Otherwise, you do not write in the content of the netCDF dimension but only create another local variable.
+    #Otherwise, you do not write in the content of the netCDF dimension but only create another local variable.
     lat[:] = lat_in
     lon[:] = lon_in
     time[:]=range(92*(year_end-year_beg+1))
@@ -720,21 +679,19 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     #-------------------------------#
     #projection
     proj_pc = ccrs.PlateCarree() 
-    # my_proj, plot_coord_labels = ccrs.Mollweide(), False # Labels not supported yet for Mollweide
-    my_proj, plot_coord_labels = proj_pc, False # Labels or OK for PlateCarree
     lons_mesh = lon_in
     lats_mesh = lat_in
     lon_in=np.array(lon_in)
     lat_in=np.array(lat_in)
 
-    titre = f"{database} daily {temp_name_dict[daily_var]} {datavar} anomaly (°C)"
+    title = f"{database} daily {temp_name_dict[daily_var]} {datavar} anomaly (°C)"
     #load JJA temperature anomaly data file
-    nc_file_temp = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{threshold_window_size}days.nc")
+    nc_file_temp = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc")
     f_temp=nc.Dataset(nc_file_temp, mode='r')
     all_time_idx=[[-1]]*(len(unique_htw_cc3d_idx))
     matplotlib.use('Agg')
     output_dir_anim = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}", 
+                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}", 
                             "animated_maps")
     pathlib.Path(output_dir_anim).mkdir(parents=True,exist_ok=True)
 
@@ -783,7 +740,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
             def draw(i):
                 ax.clear()
                 ax.set_extent([lon_in[0]+0.1, lon_in[-1]-0.1, lat_in[-1]+0.1, lat_in[0]-0.1])
-                ax.set_title(titre, fontsize='x-large')
+                ax.set_title(title, fontsize='x-large')
                 ax.add_feature(cfeature.BORDERS)
                 ax.add_feature(cfeature.LAND)
                 ax.add_feature(cfeature.OCEAN)
@@ -806,7 +763,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
 
             anim = animation.FuncAnimation(fig, update, init_func=init, frames=nb_frames, blit=False, interval=0.15, repeat=False)
             filename_movie = os.path.join(output_dir_anim,
-                                        f"Heatwave_n°{event}_{date_event[0]}_{date_event[-1]}_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.mp4")
+                                        f"Heatwave_n°{event}_{date_event[0]}_{date_event[-1]}_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.mp4")
             writervideo = animation.FFMpegWriter(fps=1)
             anim.save(filename_movie, writer=writervideo)
             plt.close()
@@ -820,23 +777,15 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     nc_file_out.close()
     f_pot_htws.close()
     output_dir_df = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
-    df_htw.to_excel(os.path.join(output_dir_df,f"df_htw_detected_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.xlsx"))
+                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+    df_htw.to_excel(os.path.join(output_dir_df,f"df_htws_V0_detected_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.xlsx"))
     return
 
 #%%
-def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, historical_climatology=False, year_beg_later=False, threshold_window_size=15,nb_days=4,flex_time_span=7):
-    '''
+def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7):
+    '''This function is used to analyse the spatial and temporal overlap between EM-DAT heatwaves and the meteorological database heatwaves (default ERA5) detected with the CC3D scan.
+    The detection threshold depends on the parameters used precedently, which is why all the above parameters are required.
     This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m)'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-        
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
 
     print('database :',database)
     print('datavar :',datavar)
@@ -853,15 +802,12 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
     else : 
         datadir = os.environ["DATADIR"]
     
-    temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
     df_emdat = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0)
     df_emdat = df_emdat[(df_emdat['Year']>=year_beg) & (df_emdat['Year']<=year_end)] #only keep events of the studied period (default 1950-2021)
-    nc_file_in = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_file_in = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     f=nc.Dataset(nc_file_in,mode='r')
-    lat_in=f.variables['lat'][:]
-    lon_in=f.variables['lon'][:]
     time_in=f.variables['time'][:]
     date_idx_JJA = [int(i) for i in time_in.data]
     time_in = np.ndarray(shape=np.shape(date_idx_JJA),dtype=int)
@@ -887,7 +833,9 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
     #indices of beggining and end of month for a JJA set of data (92 days from 1st June to 31st August)
     beg_month_only_idx_dict = {6:0,7:30,8:61} #30 days in June, 31 days in July and August
     end_month_only_idx_dict = {6:29,7:60,8:91} #30 days in June, 31 days in July and August
+    
     ignored_events = ['1994-0759-ROU','2004-0361-SPI'] #'1994-0759-ROU' occured in May, '2004-0361-SPI' occured in Canary Island which is not in the studied area
+    
     undetected_heatwaves = []
     detected_heatwaves = []
     for emdat_event in tqdm(df_emdat.index.values[:]) :
@@ -937,15 +885,15 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
             if htw_list==[] :
                 undetected_heatwaves.append(df_emdat.loc[emdat_event,'Dis No'])
             else :
-                detected_heatwaves.append(str(df_emdat.loc[emdat_event,'Dis No'])+" "+str(htw_list))
+                detected_heatwaves.append(str(df_emdat.loc[emdat_event,'Dis No'])+" "+str(htw_list))        
     output_dir = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     pathlib.Path(output_dir).mkdir(parents=True,exist_ok=True)
-    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}_flex_time_span_{flex_time_span}_days.txt"), 'w') as output :
+    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_ano_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"), 'w') as output :
         for row in undetected_heatwaves:
             output.write(str(row) + '\n')
             
-    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}_flex_time_span_{flex_time_span}_days.txt"), 'w') as output :
+    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_ano_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"), 'w') as output :
         for row in detected_heatwaves:
             output.write(str(row) + '\n')
 
@@ -954,18 +902,10 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
     return
 
 #%%
-def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, historical_climatology=False, year_beg_later=False, threshold_window_size=15,nb_days=4,flex_time_span=7):
-    '''
+def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7):
+    '''This function is used to create animated maps for the dates around which EM-DAT heatwaves are not detected in the meteorological database (default ERA5).
+    The detection threshold depends on the parameters used precedently, which is why all the above parameters are required.
     This function can be used with several databases and variables : ERA5 (t2m, wbgt and utci) and E-OBS (t2m)'''
-    if historical_climatology :
-        year_end_climatology = 1980
-    else :
-        year_end_climatology = year_end
-        
-    if year_beg_later :
-        year_beg_climatology = 1950
-    else :
-        year_beg_climatology = year_beg
 
     print('database :',database)
     print('datavar :',datavar)
@@ -983,12 +923,37 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
         datadir = os.environ["DATADIR"]
     
     temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
-    long_name_dict = {'utci' : 'Universal Thermal Climate Index', 't2m' : '2 meters temperature', 'wbgt':'Wet Bulb Globe Temperature (Brimicombe et al., 2023)'}
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
+    
+    #Link EM-DAT country names to cartopy country names for polygon plotting (2D maps)
+    country_dict_cartopy = {'Albania':'Albania', 'Austria':'Austria', 'Belarus':'Belarus',
+                    'Belgium':'Belgium', 'Bosnia and Herzegovina':'Bosnia_and_Herzegovina',
+                    'Bulgaria':'Bulgaria', 'Canary Is':None, 'Croatia':'Croatia', 'Cyprus':'Cyprus', 
+                    'Czech Republic (the)':'Czechia', 'Denmark':'Denmark', 'Estonia':'Estonia', 
+                    'Finland':'Finland', 'France':'France', 'Germany':'Germany', 'Greece':'Greece', 
+                    'Hungary':'Hungary', 'Iceland':'Iceland', 'Ireland':'Ireland', 
+                    'Italy':'Italy', 'Latvia':'Latvia', 'Lithuania':'Lithuania',
+                    'Luxembourg':'Luxembourg', 'Montenegro':'Montenegro',
+                    'Macedonia (the former Yugoslav Republic of)':'North Macedonia',
+                    'Moldova':'Moldova', 'Netherlands (the)':'Netherlands', 'Norway':'Norway', 
+                    'Poland':'Poland','Portugal':'Portugal', 'Romania':'Romania',
+                    'Russian Federation (the)':'Russia', 'Serbia':'Republic of Serbia', 
+                    'Serbia Montenegro':'Republic of Serbia', #The corresponding heatwave happened in Serbia, cf 'Location' data of EM-DAT
+                    'Slovakia':'Slovakia', 'Slovenia':'Slovenia', 'Spain':'Spain', 'Sweden':'Sweden',
+                    'Switzerland':'Switzerland', 'Turkey':'Turkey',
+                    'United Kingdom of Great Britain and Northern Ireland (the)':'United Kingdom',
+                    'Ukraine':'Ukraine','Yugoslavia':'Republic of Serbia'} #The corresponding heatwave happened in Serbia, cf 'Location' data of EM-DAT
+    resolution_cartopy = '10m'
+    category = 'cultural'
+    name = 'admin_0_countries'
+
+    shpfilename = shapereader.natural_earth(resolution_cartopy, category, name)
+    df_countries = geopandas.read_file(shpfilename)
+    
     df_emdat = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0)
     # cc3d labels netCDF file
-    nc_file_in = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_file_in = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
 
     f=nc.Dataset(nc_file_in,mode='r')
     lat_in=f.variables['lat'][:]
@@ -998,8 +963,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     time_in = np.ndarray(shape=np.shape(date_idx_JJA),dtype=int)
     time_in[:] = date_idx_JJA[:]
 
-    nc_file_potential_htws = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
-    print('nc_file_potential_htws',nc_file_potential_htws)
+    nc_file_potential_htws = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     f_pot_htws=nc.Dataset(nc_file_potential_htws, mode='r')
     date_format=f_pot_htws.variables['date_format'][:] #date as a string, yyyy-mm-dd format
     date_format_readable = [""]*len(time_in)
@@ -1016,49 +980,31 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     f_land_sea_mask = nc.Dataset(os.path.join(datadir,database,"Mask",f"Mask_Europe_land_only_{database}_{resolution}deg.nc"),mode='r')
     land_sea_mask = f_land_sea_mask.variables['mask'][:]
     #load JJA temperature anomaly data file
-    nc_file_temp = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{threshold_window_size}days.nc")
+    nc_file_temp = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc")
     f_temp=nc.Dataset(nc_file_temp, mode='r')
-    # #Link EM-DAT country names format to netCDF mask country names format
-    country_dict = {'Albania':'Albania', 'Austria':'Austria', 'Belarus':'Belarus',
-                    'Belgium':'Belgium', 'Bosnia and Herzegovina':'Bosnia_and_Herzegovina',
-                    'Bulgaria':'Bulgaria', 'Canary Is':None, 'Croatia':'Croatia', 'Cyprus':'Cyprus', 
-                    'Czech Republic (the)':'Czechia', 'Denmark':'Denmark', 'Estonia':'Estonia', 
-                    'Finland':'Finland', 'France':'France', 'Germany':'Germany', 'Greece':'Greece', 
-                    'Hungary':'Hungary', 'Iceland':'Iceland', 'Ireland':'Ireland', 
-                    'Italy':'Italy', 'Latvia':'Latvia', 'Lithuania':'Lithuania',
-                    'Luxembourg':'Luxembourg', 'Montenegro':'Montenegro',
-                    'Macedonia (the former Yugoslav Republic of)':'Macedonia',
-                    'Moldova':'Moldova', 'Netherlands (the)':'Netherlands', 'Norway':'Norway', 
-                    'Poland':'Poland','Portugal':'Portugal', 'Romania':'Romania',
-                    'Russian Federation (the)':'Russia', 'Serbia':'Serbia', 
-                    'Serbia Montenegro':'Serbia', #The corresponding heatwave happened in Serbia, cf 'Location' data of EM-DAT
-                    'Slovakia':'Slovakia', 'Slovenia':'Slovenia', 'Spain':'Spain', 'Sweden':'Sweden',
-                    'Switzerland':'Switzerland', 'Turkey':'Turkey',
-                    'United Kingdom of Great Britain and Northern Ireland (the)':'United_Kingdom',
-                    'Ukraine':'Ukraine','Yugoslavia':'Serbia'} #The corresponding heatwave happened in Serbia, cf 'Location' data of EM-DAT
-
     # #indices of beggining and end of month for a JJA set of data (92 days from 1st June to 31st August)
     beg_month_only_idx_dict = {6:0,7:30,8:61} #30 days in June, 31 days in July and August
     end_month_only_idx_dict = {6:29,7:60,8:91} #30 days in June, 31 days in July and August
     # #Read txt file containing undetected heatwaves to create undetected heatwaves list
     output_dir = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
-    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}_flex_time_span_{flex_time_span}_days.txt"),'r') as f_txt:
+                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_ano_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
         undetected_htw_list = f_txt.readlines()
     f_txt.close()
     # #Remove '\n' from strings
     for i in range(len(undetected_htw_list)) :
         undetected_htw_list[i] = undetected_htw_list[i][:-1]
     output_dir_anim = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}", 
-                            "animated_maps_undetected_heatwaves")
+                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}", 
+                            f"maps_undetected_htws_flex_{flex_time_span}_ds")
     pathlib.Path(output_dir_anim).mkdir(parents=True,exist_ok=True)
+    
     for idx in tqdm(df_emdat.index.values) :
         if df_emdat.loc[idx,'Dis No'] in undetected_htw_list :
             country=df_emdat.loc[idx,'Country']
             year_event = df_emdat.loc[idx,'Year']
             labels_cc3d = f.variables['label'][(year_event-year_beg)*92:(year_event-year_beg+1)*92,:,:] #load all JJA cc3d label data for the given year
-            temp = f_temp.variables['utci'][(year_event-year_beg)*92:(year_event-year_beg+1)*92,:,:]
+            temp = f_temp.variables[datavar][(year_event-year_beg)*92:(year_event-year_beg+1)*92,:,:]
             if np.isnan(df_emdat.loc[idx,'Start Day']) :
                 month_beg_event = int(df_emdat.loc[idx,'Start Month'])
                 month_end_event = int(df_emdat.loc[idx,'End Month'])
@@ -1089,16 +1035,13 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             #-------------------------------#
             #projection
             proj_pc = ccrs.PlateCarree() 
-            # my_proj, plot_coord_labels = ccrs.Mollweide(), False # Labels not supported yet for Mollweide
-            my_proj, plot_coord_labels = proj_pc, False # Labels or OK for PlateCarree
-
             lons_mesh = lon_in
             lats_mesh = lat_in
 
             lon_in=np.array(lon_in)
             lat_in=np.array(lat_in)
 
-            titre = f"{database} daily temp_name_dict[daily_var] {datavar} anomaly (°C).\nEM-DAT heatwave recorded in "+country
+            title = f"{database} daily {temp_name_dict[daily_var]} {datavar} anomaly (°C).\nEM-DAT heatwave recorded in {country}."
             
             matplotlib.use('Agg')
             
@@ -1132,7 +1075,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             def draw(i):
                 ax.clear()
                 ax.set_extent([lon_in[0]+0.1, lon_in[-1]-0.1, lat_in[-1]+0.1, lat_in[0]-0.1])
-                ax.set_title(titre, fontsize='x-large')
+                ax.set_title(title, fontsize='x-large')
                 ax.add_feature(cfeature.BORDERS)
                 ax.add_feature(cfeature.LAND)
                 ax.add_feature(cfeature.OCEAN)
@@ -1158,10 +1101,33 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
 
             #plt.show()
             filename_movie = os.path.join(output_dir_anim, 
-                                        f"Undetected_heatwave_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{threshold_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.mp4")
+                                        f"Undetected_heatwave_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_ds.mp4")
             writervideo = animation.FFMpegWriter(fps=1)
             anim.save(filename_movie, writer=writervideo)
             plt.close()
+            # Make 2D map of the heatwave :
+            fig = plt.figure(idx,figsize=(24,16))
+            ax = plt.axes(projection=proj_pc)
+            ax.clear()
+            ax.set_extent([lon_in[0]+0.1, lon_in[-1]-0.1, lat_in[-1]+0.1, lat_in[0]-0.1])
+            ax.set_title(title, fontsize='x-large')
+            ax.add_feature(cfeature.BORDERS)
+            ax.add_feature(cfeature.LAND)
+            ax.add_feature(cfeature.OCEAN)
+            ax.add_feature(cfeature.COASTLINE,linewidth=0.3)
+            ax.add_feature(cfeature.LAKES, alpha=0.5)
+            ax.add_feature(cfeature.RIVERS, alpha=0.5)
+            CS1 = ax.contourf(lons_mesh,lats_mesh,np.nanmean(temp[:],axis=0),cmap='cividis',transform=proj_pc, levels=the_levels)
+            #ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
+            poly = df_countries.loc[df_countries['ADMIN'] == country_dict_cartopy[country]]['geometry'].values[0]
+            try :
+                plt.plot(*poly.exterior.xy,'r')
+            except :#in case the country is not Polygon but MultiPolygon
+                for geom in poly.geoms :
+                    plt.plot(*geom.exterior.xy,'r')
+            plt.colorbar(CS1,cax=cax,orientation='horizontal')
+            plt.title(f'Temperature anomaly (°C) average between {date_event[0]} and {date_event[-1]}',{'position':(0.5,-2)})
+            plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}.png"))
     f_land_sea_mask.close()
     f.close()
     f_mask.close()
