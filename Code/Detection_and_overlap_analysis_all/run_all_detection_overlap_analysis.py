@@ -35,7 +35,7 @@ count_all_impacts=True
 #normalize_impact_country=False
 #normalize_impact_affected_region=False
 
-nb_top_events=30 #number of top detected events to look for in the litterature
+nb_top_events=15 #number of top detected events to look for in the litterature
 
 overwrite_files=False #If True, overwrite output files that already exists (may be relevant in case of code or data update)
 # if overwrite_file is True or if output file does not exist : call function ; else pass
