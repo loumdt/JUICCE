@@ -58,7 +58,7 @@ print('nb_days :',nb_days)
 #%%
 #-------------------------------------
 #define pathway to temperature data
-nc_in_path = os.path.join(datadir , "ERA5" , "t2m" ,the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_scaled_"+str(threshold_value)+"th.nc") 
+nc_in_path = os.path.join(datadir , "E-OBS" , "t2m" ,f"{the_variable}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th.nc") 
 #Load temperature data file
 f=nc.Dataset(nc_in_path, mode='r')#load input file dimensions/variables
 lat_in=f.variables['lat'][:]
@@ -72,12 +72,12 @@ date_idx_1950_in = [int(i) for i in date_idx_1950_in.data]
 dates_all_1950 = np.ndarray(shape=np.shape(date_idx_1950_in),dtype=int)
 dates_all_1950[:] = date_idx_1950_in[:]
 #%%
-#Load ERA5 mask -> masked African and Middle-East countries, ocean and sea are not masked yet
-nc_file_mask = os.path.join(datadir, "ERA5", "Mask", "Mask_Europe_1_ERA5_0.25deg.nc")#file to load the corrected mask for all Europe
+#Load E-OBS mask -> masked African and Middle-East countries, ocean and sea are also masked
+nc_file_mask = os.path.join(datadir, "E-OBS", "Mask", "Mask_Europe_E-OBS_0.1deg.nc")#file to load mask for all Europe
 f_mask=nc.Dataset(nc_file_mask,mode='r')
 Mask_0 = f_mask.variables['mask'][:]
 #%%
-nc_file_potential_htws = os.path.join(datadir , "ERA5" ,"t2m", "Detection_Canicule" , "potential_heatwaves_"+the_variable+"_"+str(nb_days)+"days_before_scan_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th.nc")
+nc_file_potential_htws = os.path.join(datadir , "E-OBS" ,"t2m", "Detection_Canicule" , "potential_heatwaves_"+the_variable+"_"+str(nb_days)+"days_before_scan_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th.nc")
 
 f_pot_htws=nc.Dataset(nc_file_potential_htws, mode='r')
 date_format=f_pot_htws.variables['date_format'][:] #date as a string, yyyy-mm-dd format
@@ -89,7 +89,7 @@ for i in tqdm(range(len(date_format))) :
     date_format_readable_year_only[i] = (date_format_readable[i])[:4]
 #%%
 #define pathway to output netCDF file, no need to create directory.
-nc_out_path = os.path.join(datadir , "ERA5" ,"t2m", "Detection_Canicule" , "detected_heatwaves_"+the_variable+"_anomaly_JJA_"+str(year_beg)+"_"+str(year_end)+"_threshold_"+str(threshold_value)+"th_"+str(nb_days)+"days.nc")
+nc_out_path = os.path.join(datadir , "E-OBS" ,"t2m", "Detection_Canicule" , f"detected_heatwaves_{the_variable}_anomaly_JJA_{year_beg}_{year_end}_threshold_{threshold_value}th_{nb_days}days.nc")
 #Create output netCDF file
 nc_file_out=nc.Dataset(nc_out_path,mode='w',format='NETCDF4_CLASSIC') #mode='w' for 'write', 'a' for 'append'
 
@@ -101,7 +101,7 @@ time_dim = nc_file_out.createDimension('time', 92*(year_end-year_beg+1)) # unlim
 #Output file title and history for more detailed information (not necessary)
 nc_file_out.title="Labels of CC3D for "+temp_name_dict[the_variable]+" temperature anomaly for JJA days from "+str(year_beg)+" to "+str(year_end)
 nc_file_out.subtitle="values are set to zero not exceeding "+str(threshold_value)+"th temperature anomaly threshold, and labels are assigned to contiguous elements"
-nc_file_out.history = "Created with ano_scale_jja_selec.py on " +datetime.today().strftime("%d/%m/%y")
+nc_file_out.history = "Created with E-OBS_use_t2m_5_cc3d_scan.py on " +datetime.today().strftime("%d/%m/%y")
 
 #Create output file variables
 # variable = nc_file_out.createVariable('variable_name',format, (dimensions))
@@ -130,10 +130,10 @@ date_idx_1950[:]=date_idx_1950_in
 #creating a masked array full of -9999
 label[:] = ma.array(-9999*np.ones((len(time_in),len(lat_in),len(lon_in))),mask=[Mask_0]*(92*(year_end-year_beg+1))) #shape is time*lat*lon
 #%%
-f_land_sea_mask = nc.Dataset(os.path.join(datadir,"ERA5","Mask","Mask_Europe_land_only_ERA5_0.25deg.nc"),mode='r')
+f_land_sea_mask = nc.Dataset(os.path.join(datadir,"E-OBS","Mask","Mask_Europe_E-OBS_0.1deg.nc"),mode='r')
 land_sea_mask = f_land_sea_mask.variables['mask'][:]
 #%%
-f_france_mask = nc.Dataset(os.path.join(datadir,"ERA5","Mask","Mask_France_ERA5_0.25deg.nc"),mode='r')
+f_france_mask = nc.Dataset(os.path.join(datadir,"E-OBS","Mask","Mask_France_E-OBS_0.1deg.nc"),mode='r')
 france_mask = f_france_mask.variables['mask'][:]
 #%%
 print("Computing cc3d.connected_components labels and dusting...")
@@ -150,7 +150,7 @@ for year in tqdm(range((year_end-year_beg+1))) :#iterate over the years
     sub_htws = (sub_htws!=-9999)
 
     connectivity = 26 # only 4,8 (2D) and 26, 18, and 6 (3D) are allowed
-    labels_in = cc3d.dust(sub_htws,775)#25*k) #int(0.6*14*14*nb_days))
+    labels_in = cc3d.dust(sub_htws,int(775*6.25))#ERA5 value times the ratio of ERA5 cell area vs E-OBS cell area  #25*k) #int(0.6*14*14*nb_days))
     labels_out, N_added = cc3d.connected_components(labels_in, connectivity=connectivity,return_N=True) #return the table of lables and the number of added patterns
     #update output netCDF variable :
     label[year*92:(year+1)*92,:,:] = ma.array(labels_out,mask=[Mask_0]*92)
@@ -200,18 +200,18 @@ lats_mesh = lat_in
 lon_in=np.array(lon_in)
 lat_in=np.array(lat_in)
 
-titre = "ERA5 daily "+temp_name_dict[the_variable]+" temperature anomaly (°C)"
+titre = "E-OBS daily "+temp_name_dict[the_variable]+" temperature anomaly (°C)"
 #%%
 #load JJA temperature anomaly data file
-nc_file_temp = os.path.join(datadir, "ERA5", "t2m", the_variable+"_anomaly_JJA_only_"+str(year_beg)+"_"+str(year_end)+".nc")
+nc_file_temp = os.path.join(datadir, "E-OBS", "t2m", f"{the_variable}_anomaly_JJA_{year_beg}_{year_end}.nc")
 #%%
 f_temp=nc.Dataset(nc_file_temp, mode='r')
 all_time_idx=[[-1]]*(len(unique_htw_cc3d_idx))
 #%%
 matplotlib.use('Agg')
-output_dir_anim = os.path.join("Output", "ERA5" , the_variable ,
-                          the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th_threshold_"+str(nb_days)+"days", 
-                          "animation_"+the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th_threshold_"+str(nb_days)+"days")
+output_dir_anim = os.path.join("Output", "E-OBS" , the_variable ,
+                          f"{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days", 
+                          f"animation_{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days")
 pathlib.Path(output_dir_anim).mkdir(parents=True,exist_ok=True)
 #%%
 #############################################################
@@ -278,7 +278,7 @@ for event in tqdm(unique_htw_cc3d_idx[:]):
             ax.add_feature(cfeature.RIVERS, alpha=0.5)
             #CS1 = ax.pcolormesh(lons_mesh,lats_mesh,var[i],cmap='cividis',transform=proj_pc, vmin=the_levels[0],vmax=the_levels[1])
             CS1 = ax.contourf(lons_mesh,lats_mesh,var[i],cmap='cividis',transform=proj_pc, levels=the_levels)
-            ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
+            ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=0.1,alpha=0.5,color='black',transform=proj_pc,zorder=100)
             
             plt.colorbar(CS1,cax=cax,orientation='horizontal')
             plt.title('Temperature (°C) on '+' '+date_event[i],{'position':(0.5,-2)})
@@ -308,7 +308,7 @@ f_mask.close()
 f_land_sea_mask.close()
 nc_file_out.close()
 f_pot_htws.close()
-output_dir_df = os.path.join("Output", "ERA5" , the_variable ,
-                          the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th_threshold_"+str(nb_days)+"days")
-df_htw.to_excel(os.path.join(output_dir_df,"df_htw_"+the_variable+"_"+str(year_beg)+"_"+str(year_end)+"_"+str(threshold_value)+"th_threshold_"+str(nb_days)+"days.xlsx"))
+output_dir_df = os.path.join("Output", "E-OBS" , the_variable ,
+                          f"{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days")
+df_htw.to_excel(os.path.join(output_dir_df,f"df_htw_{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days.xlsx"))
 #%%

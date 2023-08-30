@@ -1,534 +1,306 @@
 """This script draws the distribution of the heatwaves found in E-OBS temperature data and the impact of those also found in EM-DAT, regarding several meteo and impact criteria"""
 #%% IMPORT MODULES
-import time
-
 #from scipy.linalg.special_matrices import companion 
-start_time=time.time()
-
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import numpy.ma as ma
-import sys
+import ast
+import sys,os
+#%%
+#PC or spirit server?
+if os.name == 'nt' :
+    datadir = "Data/"
+else : 
+    datadir = os.environ["DATADIR"]
+#%%
+#Read arguments
+try : 
+    the_variable = str(sys.argv[1])
+except :
+    the_variable='tg'
 
-#%% CHOOSE VARIABLE
-the_variable = str(sys.argv[1])
-temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
+try : 
+    year_beg = int(sys.argv[2])
+except :
+    year_beg = 1950
+    
+try : 
+    year_end = int(sys.argv[3])
+except :
+    year_end = 2021
 
+try : 
+    threshold_value = int(sys.argv[4])
+except :
+    threshold_value = 95
+    
+try : 
+    nb_days = int(sys.argv[5])
+except :
+    nb_days = 4
+#%%
+#print input argument for feedback
 print('the_variable :',the_variable)
-
+print('year_beg :',year_beg)
+print('year_end :',year_end)
+print('threshold_value :',threshold_value)
+print('nb_days :',nb_days)
 #%% LOAD FILES
-data = pd.read_excel("D:/Ubuntu/PFE/Data/EM-DAT/emdat_Europe_1950-2020_heatwaves_xlsx.xlsx")
+f_label = nc.Dataset(os.path.join(datadir,"E-OBS","t2m","Detection_Canicule",f"detected_heatwaves_{the_variable}_anomaly_JJA_{year_beg}_{year_end}_threshold_{threshold_value}th_{nb_days}days.nc"))
+time_in = f_label.variables['time'][:]
+lat_in = f_label.variables['lat'][:]
+lon_in = f_label.variables['lon'][:]
 
-nc_file = "D:/Ubuntu/PFE/Data/E-OBS/Detection_Canicule/compress_heatwaves_4days_scan_2nd_step_TWICE_"+the_variable+"_anomaly_threshold_95th_scan_size35_10.0%.nc" #netcdf file containing the heatwaves from E-OBS
+f_land_sea_mask = nc.Dataset(os.path.join(datadir,"E-OBS","Mask","Mask_Europe_E-OBS_0.1deg.nc"),mode='r')
+land_sea_mask = f_land_sea_mask.variables['mask'][:]
 
-f = nc.Dataset(nc_file,mode='r')
-lon_in = f.variables['lon'][:]
-lat_in = f.variables['lat'][:]
+f_temp = nc.Dataset(os.path.join(datadir,"E-OBS","t2m","Detection_Canicule",f"potential_heatwaves_{the_variable}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th.nc"))
 
-Russo_file = "D:/Ubuntu/PFE/Data/E-OBS/Detection_Canicule/Russo_index_"+the_variable+"_summer_only_1950_2020.nc"
-f_Russo = nc.Dataset(Russo_file,mode='r')
+f_Russo = nc.Dataset(os.path.join(datadir,"E-OBS","t2m","Detection_Canicule",f"Russo_index_{the_variable}_anomaly_JJA_{year_beg}_{year_end}_threshold_{threshold_value}th.nc"))#path to the output netCDF file
 
-heatwaves_idx =   np.load("D:/Ubuntu/PFE/Data/E-OBS/Detection_Canicule/heatwaves_idx_4days_"+the_variable+"_V3.npy",allow_pickle = True) #numpy file containing the days of the E-OBS heatwaves
-heatwaves_idx_2 = np.load("D:/Ubuntu/PFE/Data/E-OBS/Detection_Canicule/heatwaves_idx_2_4days_"+the_variable+"_V3.npy",allow_pickle = True) #numpy file containing the days of the E-OBS heatwaves
-heatwaves_dates = np.load("D:/Ubuntu/PFE/Data/E-OBS/Detection_Canicule/heatwaves_dates_4days_"+the_variable+"_V3.npy",allow_pickle = True) #numpy file containing the dates of the E-OBS heatwaves
-
-#--------------------------
-#%% Define dictonaries to avoid an illegible code full of 'if'/'elif' :
-
-htw_criteria = ['Global_mean','Spatial_extent','Duration','Max','Max_spatial','Temp_sum','Pseudo_Russo','Pop_unique','Global_mean_pop','Duration_pop','Max_pop','Max_spatial_pop',
-'Spatial_extent_pop','Temp_sum_pop','Pseudo_Russo_pop','Temp_sum_pop_NL','Pseudo_Russo_pop_NL','Multi_index_temp','Multi_index_Russo','Multi_index_temp_NL','Multi_index_Russo_NL','extreme_bool','TotalDeaths','Impact_fct']
-#htw_criteria = ['Multi_index_temp','extreme_bool','TotalDeaths','Impact_fct']
-threshold_NL = 1000
-
-stefanon_htw = np.array([],dtype=np.int32)
-stefanon_htw_dico={}
-
-htw_multi = {'tg' : [127,171], 'tx' : [120,169],'tn':[62]}
-lines_htw_multi = {'tg':{127:[3,4],171:[14,15,16,17]},'tx':{120:[3,4],169:[14,15,16,17]},
-'tn':{62:[3,4]}}
-not_computed_htw_dict = {'tg' : [182,196,213,214,220,238,239,240,261,262,263,292,305],
-'tx' : [172,192,204,206,207,213,231,232,249,250,259,276],
-'tn':[107,119,120,139,151,153,154,208]} #heatwaves not directly computed
-careful_htw_dict = {'tg' : [181,195,210,218,237,260,289,304], 
-'tx' : [169,191,201,211,230,248,258,273],
-'tn':[106,118,137,150,207]}
-links_not_computed_dict = {'tg' : {181:[182],195:[196],210:[213,214],218:[220],237:[238,238,240],260:[261,262,263],289:[292],304:[305]},
-'tx':{169:[172],191:[192],201:[204,206,207],211:[213],230:[231,232],248:[249,250],258:[259],273:[276]},
-'tn':{106:[107],118:[119,120],137:[139],150:[151,153,154],207:[208]}}
-
-#%% Define the list of heatwaves that are both present in EM-DAT and E-OBS
-for i in data.index : 
-    if data.loc[i,'Stefanon_detected_'+the_variable]=='Oui' :
-        stefanon_htw = np.append(stefanon_htw,int(data.loc[i,'Detected_'+the_variable+'_file'][24:27])) #record the numbers of the heatwaves that were both found in E-OBS and EM-DAT
-        if stefanon_htw[-1] not in htw_multi[the_variable] :
-            stefanon_htw_dico[stefanon_htw[-1]] = i  #link between heatwave number and corresponding line in EM-DAT csv file
-
-stefanon_htw = np.unique(stefanon_htw)
-not_computed_htw = np.array(not_computed_htw_dict[the_variable],dtype=np.int32) #all of these heatwaves are merged with other ones, so we must not count them twice
-careful_htw = np.array(careful_htw_dict[the_variable],dtype=np.int32) #the heatwaves with which the previous ones are merged
-print(stefanon_htw)
-#--------------------------
-cell_area = np.array([6371**2*np.cos(np.pi*lat_in/180)*0.1*np.pi/180*0.1*np.pi/180]*705).T # the area in km² of each cell, depending on the latitude
-
-computed_htw_list = np.array([],dtype=object)
-
-for i in range(len(heatwaves_idx_2)) : #each heatwave has a number, ranging from 0 to 305 in my case
-    if i not in not_computed_htw :
-        computed_htw_list = np.append(computed_htw_list,str(i))
-df = pd.DataFrame(np.ones((len(computed_htw_list),len(htw_criteria))), index = computed_htw_list, columns = htw_criteria)
+f_gdp_cap = nc.Dataset(os.path.join(datadir,"E-OBS","Socio_eco_maps","GDP_cap_E-OBS_Europe_0.1deg.nc"))#path to the output netCDF file
+#%%
+f_pop_GHS_1975 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_1975_eobs_grid_Europe.nc"))
+f_pop_GHS_1980 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_1980_eobs_grid_Europe.nc"))
+f_pop_GHS_1985 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_1985_eobs_grid_Europe.nc"))
+f_pop_GHS_1990 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_1990_eobs_grid_Europe.nc"))
+f_pop_GHS_1995 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_1995_eobs_grid_Europe.nc"))
+f_pop_GHS_2000 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_2000_eobs_grid_Europe.nc"))
+f_pop_GHS_2005 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_2005_eobs_grid_Europe.nc"))
+f_pop_GHS_2010 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_2010_eobs_grid_Europe.nc"))
+f_pop_GHS_2015 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_2015_eobs_grid_Europe.nc"))
+f_pop_GHS_2020 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP","GHS_POP_2020_eobs_grid_Europe.nc"))
 
 #%% LOAD POPULATION FILES
+#Redirect the different years towards the correct (nearest in time) population data file :
+htw_year_to_pop_dict = {}
+for year in range(1950,1978):
+    htw_year_to_pop_dict[year]=f_pop_GHS_1975
+for year in range(1978,1983):
+    htw_year_to_pop_dict[year]=f_pop_GHS_1980
+for year in range(1983,1988):
+    htw_year_to_pop_dict[year]=f_pop_GHS_1985
+for year in range(1988,1993):
+    htw_year_to_pop_dict[year]=f_pop_GHS_1990
+for year in range(1993,1998):
+    htw_year_to_pop_dict[year]=f_pop_GHS_1995
+for year in range(1998,2003):
+    htw_year_to_pop_dict[year]=f_pop_GHS_2000
+for year in range(2003,2008):
+    htw_year_to_pop_dict[year]=f_pop_GHS_2005
+for year in range(2008,2013):
+    htw_year_to_pop_dict[year]=f_pop_GHS_2010
+for year in range(2013,2018):
+    htw_year_to_pop_dict[year]=f_pop_GHS_2015
+for year in range(2018,2023) :
+    htw_year_to_pop_dict[year]=f_pop_GHS_2020
+#%%
+df_htw = pd.read_excel(os.path.join("Output","E-OBS",the_variable,f"{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days",f"df_htw_{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days.xlsx"),header=0,index_col=0)
+df_emdat_not_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0) #heatwaves are not merged by event, they are dissociated when affecting several countries
+df_emdat_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves_merged.xlsx"),header=0, index_col=0) #heatwaves are merged by event number Dis No
+#%% 
+# #Read txt file containing detected heatwaves to create detected heatwaves list
+with open(os.path.join("Output","E-OBS",the_variable,f"{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days",f"emdat_detected_heatwaves_E-OBS_{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days.txt"),'r') as f_txt:
+    detected_htw_list = f_txt.readlines()
+f_txt.close()
+# #Remove '\n' from strings
+emdat_to_eobs_id_dico_not_merged = {}
+emdat_heatwaves_list = []
+for i in range(len(detected_htw_list)) :
+    emdat_to_eobs_id_dico_not_merged[detected_htw_list[i][:13]] = ast.literal_eval(detected_htw_list[i][14:-1])#Remove '\n' from strings
+    emdat_heatwaves_list = np.append(emdat_heatwaves_list,emdat_to_eobs_id_dico_not_merged[detected_htw_list[i][:13]])
+emdat_heatwaves_list = [int(i) for i in np.unique(emdat_heatwaves_list)]
+#%% #Need to consider the possibility that several EM-DAT heatwaves are not distinguishable in E-OBS
+htw_multi = []
+inverted_emdat_to_eobs_id_dico_not_merged = {}
+for htw,v in emdat_to_eobs_id_dico_not_merged.items() :
+    for val in v :
+        try : 
+            inverted_emdat_to_eobs_id_dico_not_merged[val].append(htw[:9])
+        except :
+            inverted_emdat_to_eobs_id_dico_not_merged[val]=[htw[:9]]
+for k,v in inverted_emdat_to_eobs_id_dico_not_merged.items():
+    inverted_emdat_to_eobs_id_dico_not_merged[k]=[s for s in np.unique(inverted_emdat_to_eobs_id_dico_not_merged[k])]
+    if len(inverted_emdat_to_eobs_id_dico_not_merged[k])>1:
+        htw_multi.append(k)
+#--------------------------
+#%% #For all EM-DAT merged event, record every associated EM-DAT not merged heatwave (dico_merged_htw) that are detected in E-OBS, and record every associated E-OBS heatwave (dico_merged_label)
+emdat_to_eobs_id_dico_merged_htw = {}
+emdat_to_eobs_id_dico_merged_label = {}
+for i in df_emdat_merged.index.values[:]:
+    dis_no = str(df_emdat_merged.loc[i,'disasterno'])
+    for k,v in emdat_to_eobs_id_dico_not_merged.items():
+        if dis_no in k :
+            try :
+                emdat_to_eobs_id_dico_merged_htw[dis_no].append(k)
+                emdat_to_eobs_id_dico_merged_label[dis_no] = np.append(emdat_to_eobs_id_dico_merged_label[dis_no],v)
+            except :
+                emdat_to_eobs_id_dico_merged_htw[dis_no]=[k]
+                emdat_to_eobs_id_dico_merged_label[dis_no]=[v]
+not_computed_htw = []
+links_not_computed_dict = {}
+for k,v in emdat_to_eobs_id_dico_merged_label.items():
+    emdat_to_eobs_id_dico_merged_label[k]=[int(i) for i in np.unique(v)]
+    if len(emdat_to_eobs_id_dico_merged_label[k])>1:
+        not_computed_htw = np.append(not_computed_htw,emdat_to_eobs_id_dico_merged_label[k][1:])
+        links_not_computed_dict[emdat_to_eobs_id_dico_merged_label[k][0]]=[int(i) for i in emdat_to_eobs_id_dico_merged_label[k][1:]]
+not_computed_htw = [int(i) for i in not_computed_htw]
+careful_htw = list(links_not_computed_dict.keys())
 
-pop_file_worldpop = "D:/Ubuntu/PFE/Data/Pop/WorldPop/World_pop_all_2000-2020_e-obs_grid.nc"
-f_pop_WP = nc.Dataset(pop_file_worldpop,mode='r')
-pop_file_GHS= "D:/Ubuntu/PFE/Data/Pop/GHS_pop/GHS_pop_all_e-obs_grid.nc"
-f_pop_GHS = nc.Dataset(pop_file_GHS,mode='r')
-pop_table = ma.array(np.zeros((23,len(lat_in),len(lon_in))))
-pop_table[0:2,:,:] = ma.array([f_pop_GHS.variables['pop_density'][:]])
-pop_table[2:,:,:] = ma.array([f_pop_WP.variables['pop_density'][:]])
-
+#%%
+htw_criteria = ['Global_mean','Spatial_extent','Duration','Max','Max_spatial','Temp_sum','Pseudo_Russo','Total_affected_pop','Global_mean_pop','Duration_pop','Max_pop','Max_spatial_pop',
+'Spatial_extent_pop','Temp_sum_pop','Pseudo_Russo_pop','Temp_sum_pop_NL','Pseudo_Russo_pop_NL','Multi_index_temp','Multi_index_Russo','Multi_index_temp_NL','Multi_index_Russo_NL','Mean_log_GDP',
+'Mean_exp_GDP','Mean_inv_GDP','GDP_inv_log_temp_sum','GDP_inv_log_temp_mean']
+#htw_criteria = ['Multi_index_temp']
+threshold_NL = 1000
+#%% 
 coeff_PL = 1000
+#%%
+#Do not forget to change this boolean if necessary
+count_all_impacts = True
+print("count_all_impacts :",count_all_impacts)
 
-#%% COMPUTE DISTRIBUTIONS AND VISUALISE
+#%%
+df_htw['Computed_heatwave'] = False
+df_htw['Extreme_heatwave'] = False
+df_htw['Total_Deaths'] = None
+df_htw['Total_Affected'] = None
+df_htw['Material_Damages'] = None
+df_htw['Impact_sum'] = None
 
-for htw_charac in tqdm(htw_criteria[:-3]) :
-    impact_list = np.array([]) #record the impact of the EM-DAT heatwaves
-    death_list = np.array([]) #record the impact of the EM-DAT heatwaves
-    meteo_list = np.array([]) #record the meteo criterion of the E-OBS heatwaves
-    idx_scatt = np.array([],dtype=np.int32) #record the meteo criterion of the EM-DAT heatwaves
-    nb_htw_scatt = np.array([],dtype=np.int32) #record the numbers of the EM-DAT heatwaves
-    for i in range(len(heatwaves_idx_2)) : #each heatwave has a number, ranging from 0 to 305 in mean case, 0 to 304 in max case, 0 to 123 in min case
-        #print(i)
-        if the_variable == 'tg' : #link heatwaves to the correct year for pop grid
-            if i<=110 : #Pop from year 1975 for years 1950-1982 (GHS_pop)
-                pop0 = ma.array(pop_table[0,:,:])
-            elif i<=148 : #Pop from year 1990 for years 1983-1995 (GHS_pop)
-                pop0 = ma.array(pop_table[1,:,:])
-            elif i<=176 : #Pop from year 2000 for years 1996-2000 (WorldPop)
-                pop0 = ma.array(pop_table[2,:,:])
-            elif i<= 184: #Pop from year 2001 for year 2001 (WorldPop)
-                pop0 = ma.array(pop_table[3,:,:])
-            elif i<=190 : #Pop from year 2002 for year 2002 (WorldPop)
-                pop0 = ma.array(pop_table[4,:,:])
-            elif i<= 196: #Pop from year 2003 for year 2003 (WorldPop)
-                pop0 = ma.array(pop_table[5,:,:])
-            elif i<= 201: #Pop from year 2004 for year 2004 (WorldPop)
-                pop0 = ma.array(pop_table[6,:,:])
-            elif i<= 208: #Pop from year 2005 for year 2005 (WorldPop)
-                pop0 = ma.array(pop_table[7,:,:])
-            elif i<=216 : #Pop from year 2006 for year 2006 (WorldPop)
-                pop0 = ma.array(pop_table[8,:,:])
-            elif i<=223 : #Pop from year 2007 for year 2007 (WorldPop)
-                pop0 = ma.array(pop_table[9,:,:])
-            elif i<=229 : #Pop from year 2008 for year 2008 (WorldPop)
-                pop0 = ma.array(pop_table[10,:,:])
-            elif i<=236 : #Pop from year 2009 for year 2009 (WorldPop)
-                pop0 = ma.array(pop_table[11,:,:])
-            elif i<=242 : #Pop from year 2010 for year 2010 (WorldPop)
-                pop0 = ma.array(pop_table[12,:,:])
-            elif i<=246 : #Pop from year 2011 for year 2011 (WorldPop)
-                pop0 = ma.array(pop_table[13,:,:])
-            elif i<=255 : #Pop from year 2012 for year 2012 (WorldPop)
-                pop0 = ma.array(pop_table[14,:,:])
-            elif i<=264 : #Pop from year 2013 for year 2013 (WorldPop)
-                pop0 = ma.array(pop_table[15,:,:])
-            elif i<=269 : #Pop from year 2014 for year 2014 (WorldPop)
-                pop0 = ma.array(pop_table[16,:,:])
-            elif i<=276 : #Pop from year 2015 for year 2015 (WorldPop)
-                pop0 = ma.array(pop_table[17,:,:])
-            elif i<=281 : #Pop from year 2016 for year 2016 (WorldPop)
-                pop0 = ma.array(pop_table[18,:,:])
-            elif i<=287 : #Pop from year 2017 for year 2017 (WorldPop)
-                pop0 = ma.array(pop_table[19,:,:])
-            elif i<=292 : #Pop from year 2018 for year 2018 (WorldPop)
-                pop0 = ma.array(pop_table[20,:,:])
-            elif i<=300 : #Pop from year 2019 for year 2019 (WorldPop)
-                pop0 = ma.array(pop_table[21,:,:])
-            else : #Pop from year 2020 for year 2020 (WorldPop)
-                pop0 = ma.array(pop_table[22,:,:])
-        elif the_variable == 'tx' : 
-            if i<=105 : #Pop from year 1975 for years 1950-1982 (GHS_pop)
-                pop0 = ma.array(pop_table[0,:,:])
-            elif i<=144 : #Pop from year 1990 for years 1983-1995 (GHS_pop)
-                pop0 = ma.array(pop_table[1,:,:])
-            elif i<=173 : #Pop from year 2000 for years 1996-2000 (WorldPop)
-                pop0 = ma.array(pop_table[2,:,:])
-            elif i<= 180: #Pop from year 2001 for year 2001 (WorldPop)
-                pop0 = ma.array(pop_table[3,:,:])
-            elif i<=186 : #Pop from year 2002 for year 2002 (WorldPop)
-                pop0 = ma.array(pop_table[4,:,:])
-            elif i<= 192: #Pop from year 2003 for year 2003 (WorldPop)
-                pop0 = ma.array(pop_table[5,:,:])
-            elif i<= 196: #Pop from year 2004 for year 2004 (WorldPop)
-                pop0 = ma.array(pop_table[6,:,:])
-            elif i<= 199: #Pop from year 2005 for year 2005 (WorldPop)
-                pop0 = ma.array(pop_table[7,:,:])
-            elif i<=209 : #Pop from year 2006 for year 2006 (WorldPop)
-                pop0 = ma.array(pop_table[8,:,:])
-            elif i<=215 : #Pop from year 2007 for year 2007 (WorldPop)
-                pop0 = ma.array(pop_table[9,:,:])
-            elif i<=221 : #Pop from year 2008 for year 2008 (WorldPop)
-                pop0 = ma.array(pop_table[10,:,:])
-            elif i<=228 : #Pop from year 2009 for year 2009 (WorldPop)
-                pop0 = ma.array(pop_table[11,:,:])
-            elif i<=234 : #Pop from year 2010 for year 2010 (WorldPop)
-                pop0 = ma.array(pop_table[12,:,:])
-            elif i<=237 : #Pop from year 2011 for year 2011 (WorldPop)
-                pop0 = ma.array(pop_table[13,:,:])
-            elif i<=245 : #Pop from year 2012 for year 2012 (WorldPop)
-                pop0 = ma.array(pop_table[14,:,:])
-            elif i<=250 : #Pop from year 2013 for year 2013 (WorldPop)
-                pop0 = ma.array(pop_table[15,:,:])
-            elif i<=254 : #Pop from year 2014 for year 2014 (WorldPop)
-                pop0 = ma.array(pop_table[16,:,:])
-            elif i<=261 : #Pop from year 2015 for year 2015 (WorldPop)
-                pop0 = ma.array(pop_table[17,:,:])
-            elif i<=265 : #Pop from year 2016 for year 2016 (WorldPop)
-                pop0 = ma.array(pop_table[18,:,:])
-            elif i<=270 : #Pop from year 2017 for year 2017 (WorldPop)
-                pop0 = ma.array(pop_table[19,:,:])
-            elif i<=277 : #Pop from year 2018 for year 2018 (WorldPop)
-                pop0 = ma.array(pop_table[20,:,:])
-            elif i<=285 : #Pop from year 2019 for year 2019 (WorldPop)
-                pop0 = ma.array(pop_table[21,:,:])
-            else : #Pop from year 2020 for year 2020 (WorldPop)
-                pop0 = ma.array(pop_table[22,:,:])
-        elif the_variable == 'tn' :
-            if i<=52 : #Pop from year 1975 for years 1950-1982 (GHS_pop)
-                pop0 = ma.array(pop_table[0,:,:])
-            elif i<=78 : #Pop from year 1990 for years 1983-1995 (GHS_pop)
-                pop0 = ma.array(pop_table[1,:,:])
-            elif i<=103 : #Pop from year 2000 for years 1996-2000 (WorldPop)
-                pop0 = ma.array(pop_table[2,:,:])
-            elif i<= 108: #Pop from year 2001 for year 2001 (WorldPop)
-                pop0 = ma.array(pop_table[3,:,:])
-            elif i<=113 : #Pop from year 2002 for year 2002 (WorldPop)
-                pop0 = ma.array(pop_table[4,:,:])
-            elif i<= 120: #Pop from year 2003 for year 2003 (WorldPop)
-                pop0 = ma.array(pop_table[5,:,:])
-            elif i<= 125: #Pop from year 2004 for year 2004 (WorldPop)
-                pop0 = ma.array(pop_table[6,:,:])
-            elif i<= 129: #Pop from year 2005 for year 2005 (WorldPop)
-                pop0 = ma.array(pop_table[7,:,:])
-            elif i<=135 : #Pop from year 2006 for year 2006 (WorldPop)
-                pop0 = ma.array(pop_table[8,:,:])
-            elif i<=142 : #Pop from year 2007 for year 2007 (WorldPop)
-                pop0 = ma.array(pop_table[9,:,:])
-            elif i<=145 : #Pop from year 2008 for year 2008 (WorldPop)
-                pop0 = ma.array(pop_table[10,:,:])
-            elif i<=149 : #Pop from year 2009 for year 2009 (WorldPop)
-                pop0 = ma.array(pop_table[11,:,:])
-            elif i<=155 : #Pop from year 2010 for year 2010 (WorldPop)
-                pop0 = ma.array(pop_table[12,:,:])
-            elif i<=160 : #Pop from year 2011 for year 2011 (WorldPop)
-                pop0 = ma.array(pop_table[13,:,:])
-            elif i<=167 : #Pop from year 2012 for year 2012 (WorldPop)
-                pop0 = ma.array(pop_table[14,:,:])
-            elif i<=172 : #Pop from year 2013 for year 2013 (WorldPop)
-                pop0 = ma.array(pop_table[15,:,:])
-            elif i<=178 : #Pop from year 2014 for year 2014 (WorldPop)
-                pop0 = ma.array(pop_table[16,:,:])
-            elif i<=186 : #Pop from year 2015 for year 2015 (WorldPop)
-                pop0 = ma.array(pop_table[17,:,:])
-            elif i<=192 : #Pop from year 2016 for year 2016 (WorldPop)
-                pop0 = ma.array(pop_table[18,:,:])
-            elif i<=197 : #Pop from year 2017 for year 2017 (WorldPop)
-                pop0 = ma.array(pop_table[19,:,:])
-            elif i<=203 : #Pop from year 2018 for year 2018 (WorldPop)
-                pop0 = ma.array(pop_table[20,:,:])
-            elif i<=210 : #Pop from year 2019 for year 2019 (WorldPop)
-                pop0 = ma.array(pop_table[21,:,:])
-            else : #Pop from year 2020 for year 2020 (WorldPop)
-                pop0 = ma.array(pop_table[22,:,:])
-        if i not in not_computed_htw and i not in careful_htw:
-            temp = ma.array(f.variables['temp'][heatwaves_idx_2[i,0]:heatwaves_idx_2[i,0]+heatwaves_idx_2[i,1],:,:])
-            temp = ma.masked_where(temp==0,temp) #mask where heatwave is not happening
-            russo_idx_map = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[i,0]:heatwaves_idx[i,0]+heatwaves_idx_2[i,1],:,:])
-            cell_area_3d = np.array([cell_area]*np.shape(temp)[0])
-            pop = ma.array([pop0]*np.shape(temp)[0])
-            pop_unique = ma.masked_where(temp==0,pop)
-            pop_unique = np.nanmean(pop_unique,axis=0)
-            if htw_charac == 'Global_mean' : #mean temperature anomaly over every point recorded as a part of the heatwave
-                max_area = np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list = np.append(meteo_list,np.mean(cell_area_3d*temp))
-            elif htw_charac == 'Spatial_extent' : #area of the considered heatwave in km²
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.sum(area_unique))
-            elif htw_charac == 'Duration' : #duration in days
-                meteo_list = np.append(meteo_list,heatwaves_idx_2[i,1]) 
-            elif htw_charac == 'Temp_sum' : #Sum of the normalized cell area multiplied by the temperature anomaly of every point recorded as a part of the heatwave
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.sum(cell_area_3d*temp))
-            elif htw_charac == 'Pseudo_Russo' : #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list=np.append(meteo_list,np.sum(cell_area_3d*russo_idx_map*(temp>0)))
-            elif htw_charac == 'Max_spatial' : #maximum of the temperature anomaly of the heatwave, multiplied by the cumulative normalized area
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.max(temp)*np.sum(area_unique)) 
-            elif htw_charac == 'Max' : #maximum temperature anomaly of the heatwave
-                meteo_list = np.append(meteo_list, np.max(temp))
-            elif htw_charac == 'Global_mean_pop' :
-                max_area = np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list = np.append(meteo_list,np.mean(cell_area_3d*temp)*np.mean(cell_area*pop_unique))
-            elif htw_charac == 'Spatial_extent_pop' : #area of the considered heatwave in km²
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.sum(area_unique)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Duration_pop' : #duration in days
-                meteo_list = np.append(meteo_list,heatwaves_idx_2[i,1]*np.mean(pop_unique*cell_area)) 
-            elif htw_charac == 'Temp_sum_pop' : #Sum of the normalized cell area multiplied by the temperature anomaly of every point recorded as a part of the heatwave
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.sum(cell_area_3d*temp)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Pseudo_Russo_pop' : #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list=np.append(meteo_list,np.sum(cell_area_3d*russo_idx_map*(temp>0))*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Max_pop' : #maximum temperature anomaly of the heatwave
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.max(temp)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Max_spatial_pop' : #maximum of the temperature anomaly of the heatwave, multiplied by the cumulative normalized area
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.max(temp)*np.sum(area_unique)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Pop_unique' : #maximum temperature anomaly of the heatwave
-                meteo_list = np.append(meteo_list, np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Temp_sum_pop_NL' :
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.sum(cell_area_3d*temp*coeff_PL*(pop_unique>threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique>threshold_NL))+np.sum(cell_area_3d*temp*(pop_unique<=threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique<=threshold_NL)))
-            elif htw_charac == 'Pseudo_Russo_pop_NL' : #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
-                cell_area_3d = np.array([cell_area]*np.shape(russo_idx_map)[0])
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list=np.append(meteo_list,np.sum(cell_area_3d*russo_idx_map*coeff_PL*(pop_unique>threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique>threshold_NL))+np.sum(cell_area_3d*russo_idx_map*(temp>0)*(pop_unique<=threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique<=threshold_NL)))
-            elif htw_charac == 'Multi_index_Russo' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                russo_idx_map = np.nansum(russo_idx_map,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*russo_idx_map*pop_unique)))
-            elif htw_charac == 'Multi_index_temp' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                temp = np.nansum(temp,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*temp*pop_unique)))
-            elif htw_charac == 'Multi_index_Russo_NL' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                russo_idx_map = np.nansum(russo_idx_map,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*russo_idx_map*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*russo_idx_map*pop_unique*(pop_unique<=threshold_NL))))
-            elif htw_charac == 'Multi_index_temp_NL' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                temp = np.nansum(temp,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*temp*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*temp*pop_unique*(pop_unique<=threshold_NL))))
+for htw_charac in htw_criteria:
+    df_htw[htw_charac] = None
+
+res_lat = np.abs(np.mean(lat_in[1:]-lat_in[:-1])) #latitude resolution in degrees
+res_lon = np.abs(np.mean(lon_in[1:]-lon_in[:-1])) #longitude resolution in degrees
+
+cell_area = np.array([6371**2*np.cos(np.pi*lat_in/180)*res_lat*np.pi/180*res_lon*np.pi/180]*len(lon_in)).T # the area in km² of each cell, depending on the latitude
+cell_area_3d = np.array([cell_area]*92)
+cell_area_3d_ratio = cell_area_3d/(6371**2*res_lat*np.pi/180*res_lon*np.pi/180) #each cell area as a percentage of the maximum possible cell area (obtained with lat=0°) in order to correctly weigh each cell when carrying out average
+
+gdp_time = f_gdp_cap.variables['time'][:]
+
+for htw_id in tqdm(df_htw.index.values[:]) : #list of heatwaves detected in E-OBS
+    if htw_id not in not_computed_htw :
+        df_htw.loc[htw_id,'Computed_heatwave']=True
+        new_computed_htw = [htw_id]
+        if htw_id in careful_htw : #create list of all heatwaves that are not distinguishable from the htw_id heatwave (either because of EM-DAT overlap or E-OBS overlap)
+            old_computed_htw = []
+            while new_computed_htw!=old_computed_htw :
+                old_computed_htw = new_computed_htw
+                for i in old_computed_htw :
+                    if i in links_not_computed_dict.keys() :
+                        new_computed_htw = np.append(new_computed_htw,links_not_computed_dict[i])
+                new_computed_htw = [int(j) for j in np.unique(new_computed_htw)]
+        #Compute meteo metrics
+        year = df_htw.loc[htw_id,'Year']
+        data_label = f_label.variables['label'][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
+        vals = np.array(new_computed_htw)
+        mask_htw = ~np.isin(data_label,vals)
+        table_temp = f_temp.variables['t2m'][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
+        #table_temp = table_temp.data*(data_label == vals[:, None, None, None])[0].data
+        table_temp = ma.masked_where(mask_htw+(land_sea_mask>0), table_temp)
+        table_Russo = f_Russo.variables['Russo_index'][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
+        #table_Russo = table_Russo.data*(data_label == vals[:, None, None, None])[0].data
+        table_Russo = ma.masked_where(mask_htw+(land_sea_mask>0), table_Russo)
+        pop0 = htw_year_to_pop_dict[year].variables['Band1'][:] #Population density
+        pop = ma.array([pop0]*np.shape(table_temp)[0])
+        pop = ma.masked_where(mask_htw,pop) #population density set to zero for points that are not affected by the considered heatwave(s)
+        pop_unique = pop0*(np.nanmean(pop,axis=0)>0) #population density set to zero for points that are not affected by the considered heatwave(s) and "flattened" into a 2D array
+        area_unique = cell_area*(pop_unique>0) #cell area set to zero for points that are not affected by the considered heatwave(s)
+        duration = len(np.unique(np.where((data_label == vals[:, None, None, None])[0].data)[0]))
+        affected_pop = np.nansum(pop_unique*cell_area)
+        gdp_cap_map = f_gdp_cap.variables['gdp_cap'][np.argwhere(np.array(gdp_time)==year)[0][0],:,:]
+        gdp_cap_map = ma.masked_where(np.nanmean(pop,axis=0)==0,gdp_cap_map)
+        gdp_cap_map = ma.masked_where(gdp_cap_map==0,gdp_cap_map)
+        #mean temperature anomaly over every point recorded as a part of the heatwave
+        masked_temp = ma.masked_where(table_temp==0,table_temp)
+        df_htw.loc[htw_id,'Global_mean'] = np.nanmean(table_temp*cell_area_3d_ratio)
+        df_htw.loc[htw_id,'Global_mean_pop'] = df_htw.loc[htw_id,'Global_mean']*affected_pop
+        #area of the considered heatwave in km²
+        df_htw.loc[htw_id,'Spatial_extent'] = np.nansum(area_unique)
+        df_htw.loc[htw_id,'Spatial_extent_pop'] = df_htw.loc[htw_id,'Spatial_extent']*affected_pop
+        #duration in days
+        df_htw.loc[htw_id,'Duration'] = duration
+        df_htw.loc[htw_id,'Duration_pop'] = df_htw.loc[htw_id,'Duration']*affected_pop
+        #Sum of the normalized cell area multiplied by the temperature anomaly of every point recorded as a part of the heatwave
+        df_htw.loc[htw_id,'Temp_sum'] = np.nansum(table_temp*cell_area_3d_ratio)
+        df_htw.loc[htw_id,'Temp_sum_pop'] = df_htw.loc[htw_id,'Temp_sum']*affected_pop
+        #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
+        df_htw.loc[htw_id,'Pseudo_Russo'] = np.nansum(cell_area_3d_ratio*table_Russo)
+        df_htw.loc[htw_id,'Pseudo_Russo_pop'] = df_htw.loc[htw_id,'Pseudo_Russo']*affected_pop
+        #maximum of the temperature anomaly of the heatwave, multiplied by the cumulative normalized area
+        df_htw.loc[htw_id,'Max_spatial'] = np.max(table_temp)*np.nansum(area_unique) 
+        df_htw.loc[htw_id,'Max_spatial_pop'] = df_htw.loc[htw_id,'Max_spatial']*affected_pop
+        #maximum temperature anomaly of the heatwave
+        df_htw.loc[htw_id,'Max'] = np.max(table_temp)
+        df_htw.loc[htw_id,'Max_pop'] = df_htw.loc[htw_id,'Max']*affected_pop
+        #Total affected population
+        df_htw.loc[htw_id,'Total_affected_pop'] = affected_pop
+        #
+        df_htw.loc[htw_id,'Temp_sum_pop_NL'] = np.nansum(cell_area_3d_ratio*table_temp*coeff_PL*(pop_unique>threshold_NL))*np.nansum(pop_unique*cell_area*(pop_unique>threshold_NL))+np.nansum(cell_area_3d_ratio*table_temp*(pop_unique<=threshold_NL))*np.nansum(pop_unique*cell_area*(pop_unique<=threshold_NL))
+        #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
+        df_htw.loc[htw_id,'Pseudo_Russo_pop_NL'] = np.nansum(cell_area_3d_ratio*table_Russo*coeff_PL*(pop_unique>threshold_NL))*np.nansum(pop_unique*cell_area*(pop_unique>threshold_NL))+np.nansum(cell_area_3d_ratio*table_Russo*(pop_unique<=threshold_NL))*np.nansum(pop_unique*cell_area*(pop_unique<=threshold_NL))
+        #
+        df_htw.loc[htw_id,'Multi_index_Russo'] =  np.nansum((cell_area_3d_ratio*table_Russo*pop_unique)) #np.nansum((cell_area**2*table_Russo*pop_unique))
+        #
+        df_htw.loc[htw_id,'Multi_index_temp'] =  np.nansum((cell_area_3d_ratio*table_temp*pop_unique)) #np.nansum((cell_area**2*table_temp*pop_unique))
+        #
+        df_htw.loc[htw_id,'Multi_index_Russo_NL'] = np.nansum((cell_area_3d_ratio*table_Russo*pop_unique*coeff_PL*(pop_unique>threshold_NL))) + np.nansum((cell_area_3d_ratio*table_Russo*pop_unique*(pop_unique<=threshold_NL))) #np.nansum((cell_area**2*table_Russo*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*table_Russo*pop_unique*(pop_unique<=threshold_NL)))
+        #
+        df_htw.loc[htw_id,'Multi_index_temp_NL'] = np.nansum((cell_area_3d_ratio*table_temp*pop_unique*coeff_PL*(pop_unique>threshold_NL))) + np.nansum((cell_area_3d_ratio*table_temp*pop_unique*(pop_unique<=threshold_NL))) # np.nansum((cell_area**2*temp*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*temp*pop_unique*(pop_unique<=threshold_NL)))
+        #
+        df_htw.loc[htw_id,'Mean_log_GDP'] = -np.log10(np.nanmean(gdp_cap_map*pop0))
         
-        elif i in careful_htw :
-            htws_concat = links_not_computed_dict[the_variable][i]
-            if len(htws_concat) == 1 : # two heatwaves to merge
-                temp1 = ma.array(f.variables['temp'][heatwaves_idx_2[i,0]:heatwaves_idx_2[i,0]+heatwaves_idx_2[i,1],:,:])
-                temp2 = ma.array(f.variables['temp'][heatwaves_idx_2[htws_concat[0],0]:heatwaves_idx_2[htws_concat[0],0]+heatwaves_idx_2[htws_concat[0],1],:,:])
-                
-                temp = ma.concatenate((temp1,temp2),axis=0)
-                del temp1
-                del temp2
-                temp = ma.masked_where(temp==0,temp)
-
-                russo_idx_map1 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[i,0]:heatwaves_idx[i,0]+heatwaves_idx_2[i,1],:,:])
-                russo_idx_map2 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[htws_concat[0],0]:heatwaves_idx[htws_concat[0],0]+heatwaves_idx_2[htws_concat[0],1],:,:])
-
-                russo_idx_map = ma.concatenate((russo_idx_map1,russo_idx_map2),axis=0)
-                del russo_idx_map1
-                del russo_idx_map2
-                russo_idx_map = ma.masked_where(temp==0,russo_idx_map)
-            elif len(htws_concat) == 2 : #three heatwaves to merge
-                temp1 = ma.array(f.variables['temp'][heatwaves_idx_2[i,0]:heatwaves_idx_2[i,0]+heatwaves_idx_2[i,1],:,:])
-                temp2 = ma.array(f.variables['temp'][heatwaves_idx_2[htws_concat[0],0]:heatwaves_idx_2[htws_concat[0],0]+heatwaves_idx_2[htws_concat[0],1],:,:])
-                temp3 = ma.array(f.variables['temp'][heatwaves_idx_2[htws_concat[1],0]:heatwaves_idx_2[htws_concat[1],0]+heatwaves_idx_2[htws_concat[1],1],:,:])
-
-                temp = ma.concatenate((temp1,temp2,temp3),axis=0)
-
-                del temp1
-                del temp2
-                del temp3
-                temp = ma.masked_where(temp==0,temp)
-
-                russo_idx_map1 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[i,0]:heatwaves_idx[i,0]+heatwaves_idx_2[i,1],:,:])
-                russo_idx_map2 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[htws_concat[0],0]:heatwaves_idx[htws_concat[0],0]+heatwaves_idx_2[htws_concat[0],1],:,:])
-                russo_idx_map3 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[htws_concat[1],0]:heatwaves_idx[htws_concat[1],0]+heatwaves_idx_2[htws_concat[1],1],:,:])
-
-                russo_idx_map = ma.concatenate((russo_idx_map1,russo_idx_map2,russo_idx_map3),axis=0)
-                del russo_idx_map1
-                del russo_idx_map2
-                del russo_idx_map3
-                russo_idx_map = ma.masked_where(temp==0,russo_idx_map)
-            elif len(htws_concat) == 3 : #three heatwaves to merge
-                temp1 = ma.array(f.variables['temp'][heatwaves_idx_2[i,0]:heatwaves_idx_2[i,0]+heatwaves_idx_2[i,1],:,:])
-                temp2 = ma.array(f.variables['temp'][heatwaves_idx_2[htws_concat[0],0]:heatwaves_idx_2[htws_concat[0],0]+heatwaves_idx_2[htws_concat[0],1],:,:])
-                temp3 = ma.array(f.variables['temp'][heatwaves_idx_2[htws_concat[1],0]:heatwaves_idx_2[htws_concat[1],0]+heatwaves_idx_2[htws_concat[1],1],:,:])
-                temp4 = ma.array(f.variables['temp'][heatwaves_idx_2[htws_concat[2],0]:heatwaves_idx_2[htws_concat[2],0]+heatwaves_idx_2[htws_concat[2],1],:,:])
-
-                temp = ma.concatenate((temp1,temp2,temp3,temp4),axis=0)
-
-                del temp1
-                del temp2
-                del temp3
-                del temp4
-                temp = ma.masked_where(temp==0,temp)
-
-                russo_idx_map1 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[i,0]:heatwaves_idx[i,0]+heatwaves_idx_2[i,1],:,:])
-                russo_idx_map2 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[htws_concat[0],0]:heatwaves_idx[htws_concat[0],0]+heatwaves_idx_2[htws_concat[0],1],:,:])
-                russo_idx_map3 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[htws_concat[1],0]:heatwaves_idx[htws_concat[1],0]+heatwaves_idx_2[htws_concat[1],1],:,:])
-                russo_idx_map4 = ma.array(f_Russo.variables['Russo_index'][heatwaves_idx[htws_concat[2],0]:heatwaves_idx[htws_concat[2],0]+heatwaves_idx_2[htws_concat[2],1],:,:])
-
-                russo_idx_map = ma.concatenate((russo_idx_map1,russo_idx_map2,russo_idx_map3,russo_idx_map4),axis=0)
-                del russo_idx_map1
-                del russo_idx_map2
-                del russo_idx_map3
-                del russo_idx_map4
-                russo_idx_map = ma.masked_where(temp==0,russo_idx_map)
-
-            pop = ma.array([pop0]*np.shape(temp)[0])
-            pop_unique = ma.masked_where(temp==0,pop)
-            pop_unique = np.nanmean(pop_unique,axis=0)
-            cell_area_3d = np.array([cell_area]*np.shape(temp)[0])
-            if htw_charac == 'Global_mean' : #mean temperature anomaly over every point recorded as a part of the heatwave
-                max_area = np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list = np.append(meteo_list,np.mean(cell_area_3d*temp))
-            elif htw_charac == 'Spatial_extent' : #area of the considered heatwave in km²
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.sum(area_unique))
-            elif htw_charac == 'Duration' : #duration in days
-                duration = 0
-                for htw in [i,*htws_concat] :
-                    duration+=heatwaves_idx_2[htw,1]
-                meteo_list = np.append(meteo_list,duration)
-            elif htw_charac == 'Temp_sum' : #Sum of the normalized cell area multiplied by the temperature anomaly of every point recorded as a part of the heatwave
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.sum(cell_area_3d*temp))
-            elif htw_charac == 'Pseudo_Russo' : #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
-                cell_area_3d = np.array([cell_area]*np.shape(russo_idx_map)[0])
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list=np.append(meteo_list,np.sum(cell_area_3d*russo_idx_map*(temp>0)))
-            elif htw_charac == 'Max_spatial' : #maximum of the temperature anomaly of the heatwave, multiplied by the cumulative normalized area
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.max(temp)*np.sum(area_unique))
-            elif htw_charac == 'Max' : #maximum temperature anomaly of the heatwave
-                meteo_list = np.append(meteo_list, np.max(temp))
-            elif htw_charac == 'Global_mean_pop' :
-                max_area = np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list = np.append(meteo_list,np.mean(cell_area_3d*temp)*np.sum(cell_area*pop_unique))
-            elif htw_charac == 'Spatial_extent_pop' : #area of the considered heatwave in km²
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.sum(area_unique)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Duration_pop' : #duration in days
-                meteo_list = np.append(meteo_list,heatwaves_idx_2[i,1]*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Temp_sum_pop' : #Sum of the normalized cell area multiplied by the temperature anomaly of every point recorded as a part of the heatwave
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.sum(cell_area_3d*temp)*np.sum(pop_unique*cell_area)) 
-            elif htw_charac == 'Pseudo_Russo_pop' : #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
-                cell_area_3d = np.array([cell_area]*np.shape(russo_idx_map)[0])
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list=np.append(meteo_list,np.sum(cell_area_3d*russo_idx_map*(temp>0))*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Max_pop' : #maximum temperature anomaly of the heatwave
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.max(temp)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Max_spatial_pop' : #maximum of the temperature anomaly of the heatwave, multiplied by the cumulative normalized area
-                area_unique = ma.masked_where(temp==0,cell_area_3d)
-                area_unique = np.nanmean(area_unique,axis=0)
-                meteo_list = np.append(meteo_list, np.max(temp)*np.sum(area_unique)*np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Pop_unique' : #maximum temperature anomaly of the heatwave
-                meteo_list = np.append(meteo_list, np.sum(pop_unique*cell_area))
-            elif htw_charac == 'Temp_sum_pop_NL' :
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area #area of each cell in km², normalized by the area of the largest cell of the E-OBS grid
-                meteo_list = np.append(meteo_list, np.sum(cell_area_3d*temp*coeff_PL*(pop_unique>threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique>threshold_NL))+np.sum(cell_area_3d*temp*(pop_unique<=threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique<=threshold_NL)))
-            elif htw_charac == 'Pseudo_Russo_pop_NL' : #Sum of Russo index over the heatwave (time and space), multiplied by the normalized cell area
-                cell_area_3d = np.array([cell_area]*np.shape(russo_idx_map)[0])
-                max_area=np.max(cell_area)*np.ones(np.shape(cell_area_3d))
-                cell_area_3d=cell_area_3d/max_area
-                meteo_list=np.append(meteo_list,np.sum(cell_area_3d*russo_idx_map*coeff_PL*(pop_unique>threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique>threshold_NL))+np.sum(cell_area_3d*russo_idx_map*(temp>0)*(pop_unique<=threshold_NL))*np.sum(pop_unique*cell_area*(pop_unique<=threshold_NL)))
-            elif htw_charac == 'Multi_index_Russo' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                russo_idx_map = np.nansum(russo_idx_map,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*russo_idx_map*pop_unique)))
-            elif htw_charac == 'Multi_index_temp' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                temp = np.nansum(temp,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*temp*pop_unique)))
-            elif htw_charac == 'Multi_index_Russo_NL' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                russo_idx_map = np.nansum(russo_idx_map,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*russo_idx_map*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*russo_idx_map*pop_unique*(pop_unique<=threshold_NL))))
-            elif htw_charac == 'Multi_index_temp_NL' :
-                max_area = np.max(cell_area)
-                cell_area = cell_area/max_area
-                temp = np.nansum(temp,axis=0)
-                meteo_list=np.append(meteo_list,np.sum((cell_area**2*temp*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*temp*pop_unique*(pop_unique<=threshold_NL))))
-
-        if i in stefanon_htw and i not in not_computed_htw and i not in htw_multi[the_variable] :
-            death_list = np.append(death_list, int(data.loc[stefanon_htw_dico[i],'TotalDeaths'])) #find selected impact in the csv file
-            #Impact_fct_1 = Total_Damages_1000_USD + TotalDeaths*3.8e6 USD + TotalAffected * 200k US$
-            impact_list = np.append(impact_list, int(data.loc[stefanon_htw_dico[i],'TotalDeaths'])*(2.94e3/0.9259898057) + #3.8 French VSL, 2.94 Europe mean VSL according to WHO 2014
-            int(data.loc[stefanon_htw_dico[i],'TotalAffected'])*(97/0.9259898057) + 
-            int(data.loc[stefanon_htw_dico[i],'Total_Damages_1000_USD'])/float(data.loc[stefanon_htw_dico[i],'CPI'])) #find selected impact in the csv file
-            idx_scatt = np.append(idx_scatt,meteo_list[-1]) 
-            nb_htw_scatt = np.append(nb_htw_scatt,i)
-        elif i in htw_multi[the_variable] :
-            impact_multi_htw_death=0
-            impact_multi_htw_impact=0
-            for line in lines_htw_multi[the_variable][i] :
-                impact_multi_htw_death += int(data.loc[line,'TotalDeaths']) #find selected impact in the csv file
-                impact_multi_htw_impact += (int(data.loc[line,'TotalDeaths'])*(2.94e3/0.9259898057) + #3.8 French VSL, 2.94 Europe mean VSL according to WHO 2014
-                        int(data.loc[line,'TotalAffected'])*(97/0.9259898057) + #convert $ from 2014 t dollar from 2019
-                        int(data.loc[line,'Total_Damages_1000_USD'])/float(data.loc[line,'CPI'])) #find selected impact in the csv file
-            impact_list = np.append(impact_list,impact_multi_htw_impact)
-            death_list = np.append(death_list,impact_multi_htw_death)
-            idx_scatt = np.append(idx_scatt,meteo_list[-1])
-            nb_htw_scatt = np.append(nb_htw_scatt,i)
-
-        if i in stefanon_htw and i not in not_computed_htw:
-            df.loc[str(i),'extreme_bool'] = 1
-            df.loc[str(i),'Impact_fct'] = impact_list[-1]
-            df.loc[str(i),'TotalDeaths'] = death_list[-1]
-        elif i not in not_computed_htw :
-            df.loc[str(i),'extreme_bool'] = 0
-            df.loc[str(i),'Impact_fct'] = 0
-            df.loc[str(i),'TotalDeaths'] = 0
-
-        #-------------#
-        # draw figure #
-        #-------------#
-
-    #print(htw_charac,'min',np.min(meteo_list),'max',np.max(meteo_list))
-    df.loc[:,htw_charac] = meteo_list
-df.to_excel("D:/Ubuntu/PFE/JUICCE/Output/Van_der_Wiel_graphs/"+the_variable+"/characteristics_htws_"+the_variable+".xlsx")
-df.to_csv("D:/Ubuntu/PFE/JUICCE/Output/Van_der_Wiel_graphs/"+the_variable+"/characteristics_htws_"+the_variable+".csv")
-
-
+        df_htw.loc[htw_id,'Mean_exp_GDP'] = np.exp(-np.nanmean(gdp_cap_map*pop0))
+        
+        df_htw.loc[htw_id,'Mean_inv_GDP'] = 1/(np.nanmean(gdp_cap_map*pop0))
+        
+        df_htw.loc[htw_id,'GDP_inv_log_temp_sum'] = (np.nansum((1/np.log10(gdp_cap_map))*table_temp*cell_area_3d_ratio))
+        
+        df_htw.loc[htw_id,'GDP_inv_log_temp_mean'] = (np.nanmean((1/np.log10(gdp_cap_map))*pop0*table_temp*cell_area_3d_ratio))
+            #elif htw_charac == 'Multi_index_temp_NL' :
+            #    max_area = np.max(cell_area)
+            #    cell_area = cell_area/max_area
+            #    temp = np.nansum(temp,axis=0)
+            #    meteo_list=np.append(meteo_list,np.sum((cell_area**2*temp*pop_unique*coeff_PL*(pop_unique>threshold_NL)) + (cell_area**2*temp*pop_unique*(pop_unique<=threshold_NL))))
+#%%        
+        if htw_id in emdat_heatwaves_list :
+            df_htw.loc[htw_id,'Extreme_heatwave'] = True
+            #Compute impact metrics
+            disasterno_list = []
+            for i in new_computed_htw :
+                if count_all_impacts : #count all affected countries according to EM-DAT
+                    dis_no_name = 'disasterno'
+                    disasterno_list = np.append(disasterno_list,inverted_emdat_to_eobs_id_dico_not_merged[i])
+                else : #count only visibly affected countries according to E-OBS
+                    dis_no_name = 'Dis No'
+                    disasterno_list = np.append(disasterno_list,[emdat_to_eobs_id_dico_merged_htw[k] for k in inverted_emdat_to_eobs_id_dico_not_merged[i]])
+            disasterno_list = [st for st in np.unique(disasterno_list)]
+            df_impact = df_emdat_not_merged[df_emdat_not_merged[dis_no_name].isin(disasterno_list)]
+            df_impact = df_impact.fillna(value=0)
+            df_htw.loc[htw_id,'Total_Deaths'] = int(df_impact['Total Deaths'].sum())
+            df_htw.loc[htw_id,'Total_Affected'] = int(df_impact['Total Affected'].sum())
+            df_htw.loc[htw_id,'Material_Damages'] = (df_impact["Total Damages, Adjusted ('000 US$)"].sum())*1e3 #in 2022 US$
+            df_htw.loc[htw_id,'Impact_sum'] = (int(df_htw.loc[htw_id,'Total_Deaths'])*(2.94e6*1.366/0.80645161)+ #2.94e6 US$ is Europe mean VSL according to WHO 2014, convert €2014 to US$2014 (*1.366),  then convert US$2014 to US$2022 (/0.806)
+            int(df_htw.loc[htw_id,'Total_Affected'])*(97e3*1.366/0.80645161)+ #mean value of affected people, convert €2014 to US$2014 (*1.366),  then convert US$2014 to US$2022 (/0.806)
+            (df_htw.loc[htw_id,'Material_Damages'])) #socio-economic calculation, in 2022 US$
+#%%
+#Save dataframe
+df_htw.to_excel(os.path.join("Output","E-OBS",the_variable,f"{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days",f"df_htw_{the_variable}_{year_beg}_{year_end}_{threshold_value}th_threshold_{nb_days}days"+"_count_all_impacts"*count_all_impacts+".xlsx"))
+#%%
+f_label.close()
 f_Russo.close()
-f.close()
-f_pop_GHS.close()
-f_pop_WP.close()
+f_temp.close()
+f_pop_GHS_1975.close()
+f_pop_GHS_1980.close()
+f_pop_GHS_1985.close()
+f_pop_GHS_1990.close()
+f_pop_GHS_1995.close()
+f_pop_GHS_2000.close()
+f_pop_GHS_2005.close()
+f_pop_GHS_2010.close()
+f_pop_GHS_2015.close()
+f_pop_GHS_2020.close()

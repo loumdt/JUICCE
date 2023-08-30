@@ -34,6 +34,8 @@ except :
     year_end = 2021
 
 print('the_variable :',the_variable)
+print('year_beg :',year_beg)
+print('year_end :',year_end)
 #%%
 #Load netcdf temperature data file :
 nc_in_path = os.path.join(datadir,"ERA5","t2m","ERA5_"+the_variable+"_Europe_day_0.25deg_1950-2021.nc") # path to ERA5 data netCDF file
@@ -98,7 +100,7 @@ for day_of_the_year in tqdm(range(366)): #Compute average daily temperature for 
 		stack_temp=ma.array(np.zeros((len(bis_years),len(lat_in),len(lon_in))),fill_value=np.nan)
 		idx=0
 		for i in bis_years:
-			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year,:,:])-273.15
+			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year,:,:])
 			idx+=1
 		t2m[day_of_the_year,:,:]=np.nanmean(stack_temp,axis=0)
 
@@ -106,7 +108,7 @@ for day_of_the_year in tqdm(range(366)): #Compute average daily temperature for 
 		stack_temp=ma.array(np.zeros((len(df_bis_year),len(lat_in),len(lon_in))),fill_value=np.nan)
 		idx=0
 		for i in range(len(df_bis_year)):
-			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year,:,:])-273.15
+			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year,:,:])
 			idx+=1
 		t2m[day_of_the_year,:,:]=np.nanmean(stack_temp,axis=0)
 
@@ -114,10 +116,10 @@ for day_of_the_year in tqdm(range(366)): #Compute average daily temperature for 
 		stack_temp=ma.array(np.zeros((len(df_bis_year),len(lat_in),len(lon_in))),fill_value=np.nan)
 		idx=0
 		for i in not_bis_years:
-			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year-1,:,:])-273.15
+			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year-1,:,:])
 			idx+=1
 		for i in bis_years:
-			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year,:,:])-273.15
+			stack_temp[idx,:,:]=ma.array(f.variables['t2m'][idx_start_year[i]+day_of_the_year,:,:])
 			idx+=1
 		t2m[day_of_the_year,:,:]=np.nanmean(stack_temp, axis=0)
 
@@ -128,7 +130,7 @@ extended_temp[366:732,:,:]=t2m[:,:,:]
 
 extended_temp[732:,:,:]=t2m[:,:,:]
 
-extended_temp = ma.masked_outside(extended_temp,-200,200)
+extended_temp = ma.masked_outside(extended_temp,-300,400)
 
 smooth_span=15
 
@@ -138,9 +140,9 @@ for i in tqdm(range(366,732)):
 	val_table=ma.array(np.zeros((2*smooth_span+1,len(lat_in),len(lon_in))))
 	for j in range(-smooth_span,smooth_span+1,1):
 		val_table[j]=extended_temp[i+j,:,:]
-	val_table = ma.masked_outside(val_table,-100,100)
+	val_table = ma.masked_outside(val_table,-300,400)
 	t2m[i-366,:,:] = np.nanmean(val_table,axis=0)
-t2m=ma.masked_outside(t2m,-100,100)
+t2m=ma.masked_outside(t2m,-300,400)
 
 f.close()
 nc_file_out.close()

@@ -1,0 +1,14 @@
+numpy
+netCDF4
+datetime
+tqdm
+sys
+os
+pandas
+pathlib
+cc3d
+matplotlib
+cartopy
+shapely
+geopandas
+ffmpeg

@@ -12,7 +12,7 @@ import shapely
 #%%
 #Extract only European heatwaves from EM-DAT Europe extreme events (1950-2022):
 #EM-DAT data can be downloaded at https://public.emdat.be/
-df_emdat = pd.read_excel('Data/GDIS_EM-DAT/emdat_public_2022_11_10_Europe.xlsx',header=6,dtype={'Seq': str,'Year': str})
+df_emdat = pd.read_excel('Data/GDIS_EM-DAT/emdat_public_2023_07_04_Europe&Turkey.xlsx',header=6,dtype={'Seq': str,'Year': str})
 #Add disasterno feature to be able to 'joint' easily with GDIS
 df_emdat.insert(3,'disasterno',df_emdat.loc[:,'Year']+'-'+df_emdat.loc[:,'Seq'])
 df_emdat=df_emdat[df_emdat['Disaster Subtype']=='Heat wave']

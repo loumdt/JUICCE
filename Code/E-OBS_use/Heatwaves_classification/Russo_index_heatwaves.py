@@ -1,33 +1,62 @@
 """Compute the pseudo_Russo index map. Argument is either tg for mean, tx for max, or tn for min."""
+#%%
 import netCDF4 as nc
 import numpy as np
 from tqdm import tqdm
-import sys
+import sys,os
+#%%
+#PC or spirit server?
+if os.name == 'nt' :
+    datadir = "Data/"
+else : 
+    datadir = os.environ["DATADIR"]
+#%%
+#Read arguments
+try : 
+    the_variable = str(sys.argv[1])
+except :
+    the_variable='tg'
 
-the_variable = str(sys.argv[1])
+try : 
+    year_beg = int(sys.argv[2])
+except :
+    year_beg = 1950
+    
+try : 
+    year_end = int(sys.argv[3])
+except :
+    year_end = 2021
+
+try : 
+    threshold_value = int(sys.argv[4])
+except :
+    threshold_value = 95
+    
 temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
 
 print('the_variable :',the_variable)
+print('year_beg :',year_beg)
+print('year_end :',year_end)
+print('threshold_value :',threshold_value)
+#%%
+f_temp = nc.Dataset(os.path.join(datadir,"E-OBS","t2m",f"{the_variable}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th.nc"))#path to the output netCDF file
 
-nc_file = "D:/Ubuntu/PFE/Data/E-OBS/0.1deg/temp_"+the_variable+"_anomaly_summer_only_1950-2020_scaled_to_95th.nc" #netcdf file containing the heatwaves from E-OBS
+time_in = f_temp.variables['time'][:]
+lon_in = f_temp.variables['lon'][:]
+lat_in = f_temp.variables['lat'][:]
 
-f = nc.Dataset(nc_file,mode='r')
-time_in = f.variables['time'][:]
-lon_in = f.variables['lon'][:]
-lat_in = f.variables['lat'][:]
+f_temp_25 = nc.Dataset(os.path.join(datadir,"E-OBS","t2m",f"distrib_{the_variable}_ano_{year_beg}_{year_end}_{25}th_threshold_15days.nc"))
+f_temp_75 = nc.Dataset(os.path.join(datadir,"E-OBS","t2m",f"distrib_{the_variable}_ano_{year_beg}_{year_end}_{75}th_threshold_15days.nc"))
 
-temp_25_scaled = np.load("D:/Ubuntu/PFE/Data/E-OBS/0.1deg/distrib_"+the_variable+"_ano_npy_25%_threshold_15days.npy",allow_pickle = True) #numpy file containing the days of the E-OBS heatwaves
-temp_75_scaled = np.load("D:/Ubuntu/PFE/Data/E-OBS/0.1deg/distrib_"+the_variable+"_ano_npy_75%_threshold_15days.npy",allow_pickle = True) #numpy file containing the dates of the E-OBS heatwaves
-
-temp_25_scaled = temp_25_scaled[152:244,:,:]
-temp_75_scaled = temp_75_scaled[152:244,:,:]
-
+temp_25 = f_temp_25.variables['threshold'][152:244,:,:] #JJA days, 1st June to 31st August
+temp_75 = f_temp_75.variables['threshold'][152:244,:,:] #JJA days, 1st June to 31st August
+#%%
 #-------------------
-nc_file_out=nc.Dataset("D:/Ubuntu/PFE/Data/E-OBS/Detection_Canicule/Russo_index_"+the_variable+"_summer_only_1950_2020.nc",mode='w',format='NETCDF4_CLASSIC') #path to the output netCDF file
+nc_file_out = nc.Dataset(os.path.join(datadir,"E-OBS","t2m","Detection_Canicule",f"Russo_index_{the_variable}_anomaly_JJA_{year_beg}_{year_end}_threshold_{threshold_value}th.nc"),mode='w',format='NETCDF4_CLASSIC')#path to the output netCDF file
 
 #Define netCDF output file :
-nc_file_out.createDimension('lat', 465)    # latitude axis
-nc_file_out.createDimension('lon', 705)    # longitude axis
+nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
+nc_file_out.createDimension('lon', len(lon_in))    # longitude axis
 nc_file_out.createDimension('time', None) # unlimited time axis (can be appended to)
 
 nc_file_out.title="Russo indices for the heatwaves found in E-OBS with Stefanon method for "+temp_name_dict[the_variable]+" temperature"
@@ -40,21 +69,20 @@ lon = nc_file_out.createVariable('lon', np.float32, ('lon',))
 lon.units = 'degrees_east'
 lon.long_name = 'longitude'
 time = nc_file_out.createVariable('time', np.float32, ('time',))
-time.units = 'days of summer containing a sub-heatwave from 1950 to 2020'
+time.units = f'days of JJA from {year_beg} to {year_end}'
 time.long_name = 'time'
 # Define a 3D variable to hold the data
 Russo_index = nc_file_out.createVariable('Russo_index',np.float64,('time','lat','lon')) # note: unlimited dimension is leftmost
 Russo_index.units = '°C' # degrees Celsius
-date_idx = nc_file_out.createVariable('date_idx', np.int32,('time',))
-date_idx.units = 'days of summer containing a sub-heatwave from 1950 to 2020, recorded as the matching index of the temp_anomaly_summer_only_1950-2020_scaled_to_95th.nc file'
-date_idx.long_name = 'date_index'
 # Write latitudes, longitudes.
 # Note: the ":" is necessary in these "write" statements
 lat[:] = lat_in[:] 
 lon[:] = lon_in[:]
 
-for i in tqdm(range(71)):
-    temp = f.variables['temp'][i*92:(i+1)*92,:,:]
-    Russo_index[i*92:(i+1)*92,:,:] = (temp-temp_25_scaled)/(temp_75_scaled-temp_25_scaled)
-f.close()
+for i in tqdm(range(year_end-year_beg+1)):
+    temp = f_temp.variables['t2m'][i*92:(i+1)*92,:,:]
+    Russo_index[i*92:(i+1)*92,:,:] = (temp-temp_25)/(temp_75-temp_25)
+f_temp.close()
 nc_file_out.close()
+f_temp_25.close()
+f_temp_75.close()

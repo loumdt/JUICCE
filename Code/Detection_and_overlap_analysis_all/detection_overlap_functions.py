@@ -30,8 +30,8 @@ def compute_climatology_smooth(database='ERA5', datavar='t2m', daily_var='tg', y
     print('daily_var :',daily_var)
     print('year_beg :',year_beg)
     print('year_end :',year_end)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
 
     if os.name == 'nt' :
         datadir = "Data/"
@@ -164,8 +164,8 @@ def compute_distrib_ano_percentile(database='ERA5', datavar='t2m', daily_var='tg
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('distrib_window_size :',distrib_window_size)
 
     if os.name == 'nt' :
@@ -291,8 +291,8 @@ def select_ano_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_be
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
 
     if os.name == 'nt' :
         datadir = "Data/"
@@ -431,8 +431,8 @@ def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', y
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
     if os.name == 'nt' :
@@ -544,8 +544,8 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
     if os.name == 'nt' :
@@ -556,6 +556,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
+    dust_threshold = int(775 * (float(resolution_dict['ERA5'])/float(resolution))**2)
     #-------------------------------------
     #define pathway to temperature data
     nc_in_path = os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_scaled_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
@@ -571,10 +572,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     date_idx_all_year_in = [int(i) for i in date_idx_all_year_in.data]
     dates_all_all_year = np.ndarray(shape=np.shape(date_idx_all_year_in),dtype=int)
     dates_all_all_year[:] = date_idx_all_year_in[:]
-    #Load mask -> masked African and Middle-East countries, ocean and sea are not masked yet
-    nc_file_mask = os.path.join(datadir,database,"Mask",f"Mask_Europe_1_{database}_{resolution}deg.nc")#file to load the corrected mask for all Europe
-    f_mask=nc.Dataset(nc_file_mask,mode='r')
-    Mask_0 = f_mask.variables['mask'][:]
+
     nc_file_potential_htws = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"potential_heatwaves_{database}_{datavar}_{daily_var}_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
 
     f_pot_htws=nc.Dataset(nc_file_potential_htws, mode='r')
@@ -624,12 +622,12 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     lon[:] = lon_in
     time[:]=range(92*(year_end-year_beg+1))
     date_idx_all_year[:]=date_idx_all_year_in
-    #creating a masked array full of -9999
-    label[:] = ma.array(-9999*np.ones((len(time_in),len(lat_in),len(lon_in))),mask=[Mask_0]*(92*(year_end-year_beg+1))) #shape is time*lat*lon
     f_land_sea_mask = nc.Dataset(os.path.join(datadir,database,"Mask",f"Mask_Europe_land_only_{database}_{resolution}deg.nc"),mode='r')
     land_sea_mask = f_land_sea_mask.variables['mask'][:]
     f_france_mask = nc.Dataset(os.path.join(datadir,database,"Mask",f"Mask_France_{database}_{resolution}deg.nc"),mode='r')
     france_mask = f_france_mask.variables['mask'][:]
+    #creating a masked array full of -9999
+    label[:] = ma.array(-9999*np.ones((len(time_in),len(lat_in),len(lon_in))),mask=[land_sea_mask]*(92*(year_end-year_beg+1))) #shape is time*lat*lon
     
     print("Computing cc3d.connected_components labels and dusting...")
     #nb_htws_list = [0]*30
@@ -645,10 +643,10 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
         sub_htws = (sub_htws!=-9999)
 
         connectivity = 26 # only 4,8 (2D) and 26, 18, and 6 (3D) are allowed
-        labels_in = cc3d.dust(sub_htws,775)#25*k) #int(0.6*14*14*nb_days))
+        labels_in = cc3d.dust(sub_htws,dust_threshold)#25*k) #int(0.6*14*14*nb_days))
         labels_out, N_added = cc3d.connected_components(labels_in, connectivity=connectivity,return_N=True) #return the table of lables and the number of added patterns
         #update output netCDF variable :
-        label[year*92:(year+1)*92,:,:] = ma.array(labels_out,mask=[Mask_0]*92)
+        label[year*92:(year+1)*92,:,:] = ma.array(labels_out,mask=[land_sea_mask]*92)
         label[year*92:(year+1)*92,:,:] = ma.masked_where(labels_out==0,label[year*92:(year+1)*92,:,:])
         label[year*92:(year+1)*92,:,:] += N_labels
         label[year*92:(year+1)*92,:,:] = ma.masked_where(sub_htws==0,label[year*92:(year+1)*92,:,:])
@@ -710,7 +708,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
             var_scatter = label[time_idx_var,:,:] #all labels of the chosen period
             nb_frames = len(time_idx_var)
             var = ma.array(f_temp.variables[datavar][dates_JJA,:,:])
-            var[:] = ma.masked_where([(Mask_0+land_sea_mask)>0]*nb_frames,var[:])
+            var[:] = ma.masked_where([(land_sea_mask)>0]*nb_frames,var[:])
             min_val = min(-np.abs(np.min(var)),-np.abs(np.max(var))) 
             max_val = max(np.abs(np.min(var)),np.abs(np.max(var))) 
             
@@ -772,7 +770,6 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     
     f.close()
     f_temp.close()
-    f_mask.close()
     f_land_sea_mask.close()
     nc_file_out.close()
     f_pot_htws.close()
@@ -793,8 +790,8 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
     if os.name == 'nt' :
@@ -913,8 +910,8 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
     if os.name == 'nt' :
@@ -973,10 +970,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
         date_format_readable[i] = "".join(date_format[:].astype(str).data[i])
         date_format_readable_year_only[i] = (date_format_readable[i])[:4]
 
-    #Load ERA5 mask -> masked African and Middle-East countries, ocean and sea are not masked yet
-    nc_file_mask = os.path.join(datadir, database, "Mask", f"Mask_Europe_1_{database}_{resolution}deg.nc")#file to load the corrected mask for all Europe
-    f_mask=nc.Dataset(nc_file_mask,mode='r')
-    Mask_0 = f_mask.variables['mask'][:]
+    #Load ERA5 mask -> masked African and Middle-East countries, ocean and sea
     f_land_sea_mask = nc.Dataset(os.path.join(datadir,database,"Mask",f"Mask_Europe_land_only_{database}_{resolution}deg.nc"),mode='r')
     land_sea_mask = f_land_sea_mask.variables['mask'][:]
     #load JJA temperature anomaly data file
@@ -1045,7 +1039,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             
             matplotlib.use('Agg')
             
-            temp[:] = ma.masked_where([(Mask_0+land_sea_mask)>0]*(np.shape(temp)[0]),temp[:])
+            temp[:] = ma.masked_where([(land_sea_mask)>0]*(np.shape(temp)[0]),temp[:])
             nb_frames = np.shape(temp)[0]
             min_val = min(-np.abs(np.min(temp)),-np.abs(np.max(temp))) 
             max_val = max(np.abs(np.min(temp)),np.abs(np.max(temp))) 
@@ -1130,6 +1124,5 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}.png"))
     f_land_sea_mask.close()
     f.close()
-    f_mask.close()
     f_temp.close()
     return

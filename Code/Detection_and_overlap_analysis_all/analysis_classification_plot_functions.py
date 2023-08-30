@@ -29,8 +29,8 @@ def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     print('daily_var :',daily_var)
     print('year_beg :',year_beg)
     print('year_end :',year_end)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('distrib_window_size :',distrib_window_size)
     
     if os.name == 'nt' :
@@ -99,8 +99,8 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
     if os.name == 'nt' :
@@ -260,7 +260,7 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
             data_label = f_label.variables['label'][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
             vals = np.array(new_computed_htw)
             mask_htw = ~np.isin(data_label,vals)
-            table_temp = f_temp.variables['t2m'][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
+            table_temp = f_temp.variables[datavar][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
             #table_temp = table_temp.data*(data_label == vals[:, None, None, None])[0].data
             table_temp = ma.masked_where(mask_htw+(land_sea_mask>0), table_temp)
             table_Russo = f_Russo.variables['Russo_HWMId'][(year-year_beg)*92:(year-year_beg+1)*92,:,:]
@@ -372,8 +372,8 @@ def compute_heatwaves_metrics_scores(database='ERA5', datavar='t2m', daily_var='
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     print('count_all_impacts :',count_all_impacts)
     
@@ -438,8 +438,8 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     print('count_all_impacts :',count_all_impacts)
     
@@ -626,9 +626,10 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
     print('year_beg :',year_beg)
     print('year_end :',year_end)
     print('threshold_value :',threshold_value)
-    print('year_beg_climatolgy :',year_beg_climatology)
-    print('year_end_climatolgy :',year_end_climatology)
+    print('year_beg_climatology :',year_beg_climatology)
+    print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
+    print('nb_top_events :',nb_top_events)
     
     if os.name == 'nt' :
         datadir = "Data/"
@@ -680,7 +681,7 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
     df_htw = df_htw[np.isnan(df_htw['Total_Deaths'])]#we study top events that are not recorded in EM-DAT
     top_events_id = np.sort(df_htw.sort_values(by=best_scoring_index).index[-nb_top_events:])
     df_htw = df_htw[df_htw.index.isin(top_events_id)]
-
+    ranks = df_htw[best_scoring_index].rank(ascending=False)
     nc_file_label = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     f_label=nc.Dataset(nc_file_label,mode='r')
 
@@ -694,7 +695,7 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
     overlap_list_dict = {}
     affected_countries_labels_dict = {}
 
-    output_overlap_df = pd.DataFrame(columns=['Year','idx_beg_JJA','idx_end_JJA','idx_beg_all_year','idx_end_all_year','detected_affected_countries','Hammond_htw_indices','Hammond_affected_countries','Hammond_deaths'],index=None,data=None)
+    output_overlap_df = pd.DataFrame(columns=['detected_rank','Year','idx_beg_JJA','idx_end_JJA','idx_beg_all_year','idx_end_all_year','detected_start_date','detected_end_date','detected_affected_countries','Hammond_htw_indices','Hammond_affected_countries','Hammond_deaths'],index=None,data=None)
     
     for htw_id in tqdm(df_htw.index) :
         year_event = df_htw.loc[htw_id,'Year']
@@ -716,7 +717,7 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
         affected_countries_labels_dict[htw_id] = [int(val) for val in np.unique((ma.filled(labels_cc3d,fill_value=0)==htw_id)*country_labels)[1:]] #ignore value 0
         hammond_affected_countries = [df_impact_alternate.loc[index,'Country'] for index in overlap_list]
         hammond_deaths = np.sum([df_impact_alternate.loc[index,'Deaths'] for index in overlap_list])
-        output_overlap_df.loc[htw_id]=[year_event,df_htw.loc[htw_id,'idx_beg_JJA'],df_htw.loc[htw_id,'idx_end_JJA'],start_date_idx_all_year,end_date_idx_all_year,[inv_dict_country_labels[country] for country in affected_countries_labels_dict[htw_id]],overlap_list,hammond_affected_countries,hammond_deaths]
+        output_overlap_df.loc[htw_id]=[int(ranks.loc[htw_id]),year_event,df_htw.loc[htw_id,'idx_beg_JJA'],df_htw.loc[htw_id,'idx_end_JJA'],start_date_idx_all_year,end_date_idx_all_year,date(year_beg,1,1)+timedelta(days=int(start_date_idx_all_year)),date(year_beg,1,1)+timedelta(days=int(end_date_idx_all_year)),[inv_dict_country_labels[country] for country in affected_countries_labels_dict[htw_id]],overlap_list,hammond_affected_countries,hammond_deaths]
         
     output_overlap_df.to_excel(os.path.join(output_dir_df,f"top_{nb_top_events}_events_overlap{'_count_all_impacts'*count_all_impacts}_flex_time_{flex_time_span}days.xlsx"))
     return
