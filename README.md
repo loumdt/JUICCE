@@ -20,4 +20,4 @@ https://ghsl.jrc.ec.europa.eu/ghs_pop2019.php
 
 
 ## Code
-Set parameters in run_all_detection_overlap_analysis.py and run this script to carry out the entire heatwaves detection and overlap analysis process.
+Set parameters in run_all_detection_overlap_analysis.py and run this script to carry out the entire heatwaves detection and overlap analysis process. It calls functions in detection_overlap_functions.py and analysis_classification_plot_functions.py.
