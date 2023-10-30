@@ -17,3 +17,7 @@ https://worldpop.org/
 
 ### GHS-POP dataset
 https://ghsl.jrc.ec.europa.eu/ghs_pop2019.php
+
+
+## Code
+Set parameters in run_all_detection_overlap_analysis.py and run this script to carry out the entire heatwaves detection and overlap analysis process.
