@@ -20,7 +20,7 @@ from adjustText import adjust_text
 import ast
 from sklearn import metrics
 #%%
-def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15):
+def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15, anomaly=True):
     """Compute the pseudo_Russo index map.
     Based on HWMId defined by Russo et al (2015, http://dx.doi.org/10.1088/1748-9326/10/12/124003 )."""
 
@@ -38,29 +38,32 @@ def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     else : 
         datadir = os.environ["DATADIR"]
     
+    name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
+    name_dict_threshold = {True : 'th', False : 'C'}
+    
     temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
 
-    f_anomaly_meteo = nc.Dataset(os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc"))#path to the output netCDF file
+    f_var_meteo = nc.Dataset(os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc"))#path to the output netCDF file
 
-    time_in = f_anomaly_meteo.variables['time'][:]
-    lon_in = f_anomaly_meteo.variables['lon'][:]
-    lat_in = f_anomaly_meteo.variables['lat'][:]
+    time_in = f_var_meteo.variables['time'][:]
+    lon_in = f_var_meteo.variables['lon'][:]
+    lat_in = f_var_meteo.variables['lat'][:]
 
-    f_anomaly_meteo_25p = nc.Dataset(os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{25}th_threshold_{distrib_window_size}days.nc"))
-    f_anomaly_meteo_75p = nc.Dataset(os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{75}th_threshold_{distrib_window_size}days.nc"))
+    f_var_meteo_25p = nc.Dataset(os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{year_beg_climatology}_{year_end_climatology}_{25}th_threshold_{distrib_window_size}days.nc"))
+    f_var_meteo_75p = nc.Dataset(os.path.join(datadir,database,datavar,f"distrib_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{year_beg_climatology}_{year_end_climatology}_{75}th_threshold_{distrib_window_size}days.nc"))
 
-    var_25 = f_anomaly_meteo_25p.variables['threshold'][152:244,:,:] #JJA days, 1st June to 31st August
-    var_75 = f_anomaly_meteo_75p.variables['threshold'][152:244,:,:] #JJA days, 1st June to 31st August
+    var_25 = f_var_meteo_25p.variables['threshold'][152:244,:,:] #JJA days, 1st June to 31st August
+    var_75 = f_var_meteo_75p.variables['threshold'][152:244,:,:] #JJA days, 1st June to 31st August
 
     #-------------------
-    nc_file_out = nc.Dataset(os.path.join(datadir,database,datavar,f"Russo_HWMId_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc.nc"),mode='w',format='NETCDF4_CLASSIC')#path to the output netCDF file
+    nc_file_out = nc.Dataset(os.path.join(datadir,database,datavar,f"Russo_HWMId_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc.nc"),mode='w',format='NETCDF4_CLASSIC')#path to the output netCDF file
 
     #Define netCDF output file :
     nc_file_out.createDimension('lat', len(lat_in))    # latitude axis
     nc_file_out.createDimension('lon', len(lon_in))    # longitude axis
     nc_file_out.createDimension('time', None) # unlimited time axis (can be appended to)
 
-    nc_file_out.title=f"Russo HWMId for {database}, daily {temp_name_dict[daily_var]} {datavar} anomaly"
+    nc_file_out.title=f"Russo HWMId for {database}, daily {temp_name_dict[daily_var]} {datavar} {name_dict_anomaly[anomaly]}"
 
     lat = nc_file_out.createVariable('lat', np.float32, ('lat',))
     lat.units = 'degrees_north'
@@ -81,16 +84,16 @@ def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     time[:] = time_in[:]
 
     for i in tqdm(range(year_end-year_beg+1)):
-        var = f_anomaly_meteo.variables[datavar][i*92:(i+1)*92,:,:]
+        var = f_var_meteo.variables[datavar][i*92:(i+1)*92,:,:]
         Russo_HWMId[i*92:(i+1)*92,:,:] = (var-var_25)/(var_75-var_25)
-    f_anomaly_meteo.close()
+    f_var_meteo.close()
     nc_file_out.close()
-    f_anomaly_meteo_25p.close()
-    f_anomaly_meteo_75p.close()
+    f_var_meteo_25p.close()
+    f_var_meteo_75p.close()
     return
 
 #%%
-def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True):
+def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True, anomaly=True, relative_threshold=True):
     '''This function is used to create the dataset of the metrics of the detected heatwaves. The set of detected heatwaves depends on all the parameters.'''
 
     print('database :',database)
@@ -108,10 +111,13 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     else : 
         datadir = os.environ["DATADIR"]
     
+    name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
+    name_dict_threshold = {True : 'th', False : 'C'}
+    
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
     # LOAD FILES
-    f_label = nc.Dataset(os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc"),mode='r')
+    f_label = nc.Dataset(os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc"),mode='r')
     time_in = f_label.variables['time'][:]
     lat_in = f_label.variables['lat'][:]
     lon_in = f_label.variables['lon'][:]
@@ -119,8 +125,8 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     f_land_sea_mask = nc.Dataset(os.path.join(datadir,database,"Mask",f"Mask_Europe_land_only_{database}_{resolution}deg.nc"),mode='r')
     land_sea_mask = f_land_sea_mask.variables['mask'][:]
 
-    f_temp = nc.Dataset(os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_anomaly_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc"),mode='r')
-    f_Russo = nc.Dataset(os.path.join(datadir,database,datavar,f"Russo_HWMId_{database}_{datavar}_{daily_var}_ano_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc.nc"),mode='r')#path to the output netCDF file
+    f_temp = nc.Dataset(os.path.join(datadir,database,datavar,f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{year_beg}_{year_end}_climatology_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc"),mode='r')
+    f_Russo = nc.Dataset(os.path.join(datadir,database,datavar,f"Russo_HWMId_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{year_beg_climatology}_{year_end_climatology}_{distrib_window_size}days.nc.nc"),mode='r')#path to the output netCDF file
     f_gdp_cap = nc.Dataset(os.path.join(datadir,database,"Socio_eco_maps",f"GDP_cap_{database}_Europe_{resolution}deg.nc"),mode='r')#path to the output netCDF file
     
     f_pop_GHS_1975 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP",f"GHS_POP_1975_{database}_grid_Europe.nc"))
@@ -158,12 +164,12 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
         htw_year_to_pop_dict[year]=f_pop_GHS_2020
 
     output_dir = os.path.join("Output",database,f"{datavar}_{daily_var}",
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
-    df_htw = pd.read_excel(os.path.join(output_dir,f"df_htws_V0_detected_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.xlsx"),header=0,index_col=0)
+                            f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+    df_htw = pd.read_excel(os.path.join(output_dir,f"df_htws_V0_detected_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.xlsx"),header=0,index_col=0)
     df_emdat_not_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0) #heatwaves are not merged by event, they are dissociated when affecting several countries
     df_emdat_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves_merged.xlsx"),header=0, index_col=0) #heatwaves are merged by event number Dis No 
     # #Read txt file containing detected heatwaves to create detected heatwaves list
-    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_ano_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
+    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
         detected_htw_list = f_txt.readlines()
     f_txt.close()
     # #Remove '\n' from strings
@@ -173,7 +179,7 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
         emdat_to_meteo_db_id_dico_not_merged[detected_htw_list[i][:13]] = ast.literal_eval(detected_htw_list[i][14:-1])#Remove '\n' from strings
         emdat_heatwaves_list = np.append(emdat_heatwaves_list,emdat_to_meteo_db_id_dico_not_merged[detected_htw_list[i][:13]])
     emdat_heatwaves_list = [int(i) for i in np.unique(emdat_heatwaves_list)]
-    #%% #Need to consider the possibility that several EM-DAT heatwaves are not distinguishable in meteo database
+    #Need to consider the possibility that several EM-DAT heatwaves are not distinguishable in meteo database
     htw_multi = []
     inverted_emdat_to_meteo_db_id_dico_not_merged = {}
     for htw,v in emdat_to_meteo_db_id_dico_not_merged.items() :
@@ -187,7 +193,7 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
         if len(inverted_emdat_to_meteo_db_id_dico_not_merged[k])>1:
             htw_multi.append(k)
     #--------------------------
-    #%% #For all EM-DAT merged event, record every associated EM-DAT not merged heatwave (dico_merged_htw) that are detected in meteo database, and record every associated meteo database heatwave (dico_merged_label)
+    #For all EM-DAT merged event, record every associated EM-DAT not merged heatwave (dico_merged_htw) that are detected in meteo database, and record every associated meteo database heatwave (dico_merged_label)
     emdat_to_meteo_db_id_dico_merged_htw = {}
     emdat_to_meteo_db_id_dico_merged_label = {}
     for i in df_emdat_merged.index.values[:]:
@@ -210,20 +216,16 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     not_computed_htw = [int(i) for i in not_computed_htw]
     careful_htw = list(links_not_computed_dict.keys())
 
-    #%%
     htw_criteria = ['Global_mean','Spatial_extent','Duration','Max','Max_spatial','Temp_sum','Pseudo_Russo','Total_affected_pop','Global_mean_pop','Duration_pop','Max_pop','Max_spatial_pop',
     'Spatial_extent_pop','Temp_sum_pop','Pseudo_Russo_pop','Temp_sum_pop_NL','Pseudo_Russo_pop_NL','Multi_index_temp','Multi_index_Russo','Multi_index_temp_NL','Multi_index_Russo_NL','Mean_log_GDP',
     'Mean_exp_GDP','Mean_inv_GDP','GDP_inv_log_temp_sum','GDP_inv_log_temp_mean']
     #htw_criteria = ['Multi_index_temp']
     threshold_NL = 1000
-    #%% 
     coeff_PL = 1000
-    #%%
     #Do not forget to change this boolean if necessary
     count_all_impacts = True
     print("count_all_impacts :",count_all_impacts)
 
-    #%%
     df_htw['Computed_heatwave'] = False
     df_htw['Extreme_heatwave'] = False
     df_htw['Total_Deaths'] = None
@@ -363,7 +365,7 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     return
 
 #%%
-def compute_heatwaves_metrics_scores(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True):
+def compute_heatwaves_metrics_scores(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True, anomaly=True, relative_threshold=True):
     '''This function is used to compute the scores of the metrics of the detected heatwaves. The set of detected heatwaves depends on all the parameters.'''
 
     print('database :',database)
@@ -382,9 +384,12 @@ def compute_heatwaves_metrics_scores(database='ERA5', datavar='t2m', daily_var='
     else : 
         datadir = os.environ["DATADIR"]
     
+    name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
+    name_dict_threshold = {True : 'th', False : 'C'}
+    
     count_all_impacts = True #True : count all affected countries according to EM-DAT ; False : #count only visibly affected countries according to ERA5
     dataframe_dir = os.path.join("Output",database,f"{datavar}_{daily_var}",
-                                        f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+                                        f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     df_htw = pd.read_excel(os.path.join(dataframe_dir,
                                         f"df_htws_detected{'_count_all_impacts'*count_all_impacts}_flex_time_{flex_time_span}days.xlsx"),header=0,index_col=0)
     impact_criteria = ['Total_Deaths','Total_Affected','Material_Damages','Impact_sum']
@@ -429,7 +434,7 @@ def compute_heatwaves_metrics_scores(database='ERA5', datavar='t2m', daily_var='
     return
 
 #%%
-def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True):
+def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True, anomaly=True, relative_threshold=True):
     '''This function is used to plot the distribution of the detected heatwaves according to different metrics. The set of detected heatwaves depends on all the parameters.'''
 
     print('database :',database)
@@ -448,9 +453,12 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     else : 
         datadir = os.environ["DATADIR"]
     
+    name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
+    name_dict_threshold = {True : 'th', False : 'C'}
+    
     count_all_impacts = True #True : count all affected countries according to EM-DAT ; False : #count only visibly affected countries according to ERA5
     dataframe_dir = os.path.join("Output",database,f"{datavar}_{daily_var}",
-                                        f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+                                        f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     df_htw = pd.read_excel(os.path.join(dataframe_dir,
                                         f"df_htws_detected{'_count_all_impacts'*count_all_impacts}_flex_time_{flex_time_span}days.xlsx"),header=0,index_col=0)
     
@@ -508,7 +516,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     df_emdat_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves_merged.xlsx"),header=0, index_col=0) #heatwaves are merged by event number Dis No
     
     # #Read txt file containing detected heatwaves to create detected heatwaves list
-    with open(os.path.join(dataframe_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_ano_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
+    with open(os.path.join(dataframe_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
         detected_htw_list = f_txt.readlines()
     f_txt.close()
     # #Remove '\n' from strings
@@ -609,13 +617,13 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
             plt.title('Impact of the extreme heatwaves ('+chosen_impact+')',y=1,size=25)
             plt.colorbar(cax=cax,orientation='horizontal')
             #plt.tight_layout()
-            plt.savefig(os.path.join(figs_output_dir,f"distrib_{chosen_impact}_{chosen_meteo}_{'_count_all_impacts'*count_all_impacts}.png"))
+            plt.savefig(os.path.join(figs_output_dir,f"distrib_{chosen_impact}_{chosen_meteo}{'_count_all_impacts'*count_all_impacts}.png"))
             fig.clear()
             #plt.show()
     return
 
 #%%
-def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7,nb_top_events=30,best_scoring_index='Multi_index_Russo',count_all_impacts=True):
+def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7,nb_top_events=30,best_scoring_index='Multi_index_Russo',count_all_impacts=True, anomaly=True, relative_threshold=True):
     '''This function is used to search for the top detected heatwaves in an alternate impact database.'''
     #combinations = [['ERA5','t2m'],['ERA5','wbgt'],['E-OBS','t2m']]
     #for database,datavar in combinations :
@@ -635,6 +643,9 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
+    
+    name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
+    name_dict_threshold = {True : 'th', False : 'C'}
     
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
     resolution = resolution_dict[database]
@@ -672,7 +683,7 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
     
     
     output_dir_df = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
-                            f"{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
+                            f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     df_htw = pd.read_excel(os.path.join(output_dir_df,f"df_htws_detected{'_count_all_impacts'*count_all_impacts}_flex_time_{flex_time_span}days.xlsx"), header=0, index_col=0)
     df_impact_alternate = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","Lucy_Hammond_ETE_data_V2.xlsx"), header=0, index_col=0)
     df_impact_alternate = df_impact_alternate[df_impact_alternate['Country'].isin(country_dict.keys())]
@@ -682,7 +693,7 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
     top_events_id = np.sort(df_htw.sort_values(by=best_scoring_index).index[-nb_top_events:])
     df_htw = df_htw[df_htw.index.isin(top_events_id)]
     ranks = df_htw[best_scoring_index].rank(ascending=False)
-    nc_file_label = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_anomaly_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}th_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
+    nc_file_label = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
     f_label=nc.Dataset(nc_file_label,mode='r')
 
     lat_in = f_label.variables['lat'][:]
