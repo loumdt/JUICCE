@@ -4,6 +4,12 @@ Data/*
 !Data/GDIS_EM-DAT/EMDAT_Europe-1950-2022-heatwaves.xlsx
 !Data/GDIS_EM-DAT/Lucy_Hammond_ETE_data_V2.xlsx
 Code/Mask/*.png
+Code/CDS_API_request/*
+Code/Cluster_analysis/*
+Code/Data_download/*
+Code/Data_formatting/*
+Code/E-OBS_use/*
+Code/ERA5_use/*
 Mask/*.png
 *.mp4
 ffmpeg.exe
