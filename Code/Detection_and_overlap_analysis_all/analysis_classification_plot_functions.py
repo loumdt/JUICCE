@@ -139,9 +139,33 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     f_pop_GHS_2010 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP",f"GHS_POP_2010_{database}_grid_Europe.nc"))
     f_pop_GHS_2015 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP",f"GHS_POP_2015_{database}_grid_Europe.nc"))
     f_pop_GHS_2020 = nc.Dataset(os.path.join(datadir,"Pop","GHS_POP",f"GHS_POP_2020_{database}_grid_Europe.nc"))
+    
+    
+    f_age_over65_worldpop_2000 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2001 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2002 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2003 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2004 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2005 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2006 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2007 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2000_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2008 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2005_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2009 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2010_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2010 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2015_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2011 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2005_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2012 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2010_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2013 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2015_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2014 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2005_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2015 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2010_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2016 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2015_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2017 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2005_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2018 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2010_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2019 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2015_{database}_grid_Europe.nc"))
+    f_age_over65_worldpop_2020 = nc.Dataset(os.path.join(datadir,"Pop","WorldPop","over65",f"GHS_POP_2020_{database}_grid_Europe.nc"))
     #LOAD POPULATION FILES
     #Redirect the different years towards the correct (nearest in time) population data file :
     htw_year_to_pop_dict = {}
+    htw_year_to_age_dict = {}
     for year in range(1950,1978):
         htw_year_to_pop_dict[year]=f_pop_GHS_1975
     for year in range(1978,1983):
@@ -169,7 +193,7 @@ def create_heatwaves_metrics_database(database='ERA5', datavar='t2m', daily_var=
     df_emdat_not_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0) #heatwaves are not merged by event, they are dissociated when affecting several countries
     df_emdat_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves_merged.xlsx"),header=0, index_col=0) #heatwaves are merged by event number Dis No 
     # #Read txt file containing detected heatwaves to create detected heatwaves list
-    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
+    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{threshold_value}{name_dict_threshold[relative_threshold]}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
         detected_htw_list = f_txt.readlines()
     f_txt.close()
     # #Remove '\n' from strings
@@ -516,7 +540,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     df_emdat_merged = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves_merged.xlsx"),header=0, index_col=0) #heatwaves are merged by event number Dis No
     
     # #Read txt file containing detected heatwaves to create detected heatwaves list
-    with open(os.path.join(dataframe_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
+    with open(os.path.join(dataframe_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{threshold_value}{name_dict_threshold[relative_threshold]}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
         detected_htw_list = f_txt.readlines()
     f_txt.close()
     # #Remove '\n' from strings

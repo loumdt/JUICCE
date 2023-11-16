@@ -478,9 +478,11 @@ def select_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_beg=19
 
     f.close()
     nc_file_out.close()
-    f_climatology_mean.close()
+    if anomaly :
+        f_climatology_mean.close()
     nc_file_out_not_scaled.close()
-    f_threshold.close()
+    if relative_threshold :
+        f_threshold.close()
     return
 
 #%%
@@ -959,11 +961,11 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
     output_dir = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
                             f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     pathlib.Path(output_dir).mkdir(parents=True,exist_ok=True)
-    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"), 'w') as output :
+    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{threshold_value}{name_dict_threshold[relative_threshold]}_flex_time_{flex_time_span}_days.txt"), 'w') as output :
         for row in undetected_heatwaves:
             output.write(str(row) + '\n')
             
-    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"), 'w') as output :
+    with open(os.path.join(output_dir,f"emdat_detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{threshold_value}{name_dict_threshold[relative_threshold]}_flex_time_{flex_time_span}_days.txt"), 'w') as output :
         for row in detected_heatwaves:
             output.write(str(row) + '\n')
 
@@ -1001,7 +1003,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     
     #Link EM-DAT country names to cartopy country names for polygon plotting (2D maps)
     country_dict_cartopy = {'Albania':'Albania', 'Austria':'Austria', 'Belarus':'Belarus',
-                    'Belgium':'Belgium', 'Bosnia and Herzegovina':'Bosnia_and_Herzegovina',
+                    'Belgium':'Belgium', 'Bosnia and Herzegovina':'Bosnia and Herzegovina',
                     'Bulgaria':'Bulgaria', 'Canary Is':None, 'Croatia':'Croatia', 'Cyprus':'Cyprus', 
                     'Czech Republic (the)':'Czechia', 'Denmark':'Denmark', 'Estonia':'Estonia', 
                     'Finland':'Finland', 'France':'France', 'Germany':'Germany', 'Greece':'Greece', 
@@ -1058,7 +1060,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     # #Read txt file containing undetected heatwaves to create undetected heatwaves list
     output_dir = os.path.join("Output",database,f"{datavar}_{daily_var}" ,
                             f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
-    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}ds_bf_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}ds_wndw_clmgy_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
+    with open(os.path.join(output_dir,f"emdat_undetected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_{threshold_value}{name_dict_threshold[relative_threshold]}_flex_time_{flex_time_span}_days.txt"),'r') as f_txt:
         undetected_htw_list = f_txt.readlines()
     f_txt.close()
     # #Remove '\n' from strings
@@ -1208,6 +1210,8 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
                     ax_map.plot(*geom.exterior.xy,'green',linewidth=3)
             #plt.title(f'Temperature {name_dict_anomaly[anomaly]} (°C) average between {date_event[0]} and {date_event[-1]}',{'position':(0.5,-2)})
             plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}.png"))
+            plt.close()
+            
     f_land_sea_mask.close()
     f.close()
     f_temp.close()
