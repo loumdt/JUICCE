@@ -11,10 +11,12 @@ import cc3d #connected components patterns
 import matplotlib
 import matplotlib.pyplot as plt 
 import matplotlib.animation as animation
+from matplotlib.font_manager import FontProperties
 import cartopy.crs as ccrs 
 import cartopy.feature as cfeature 
 from shapely.geometry import Polygon
 from shapely.geometry import Point
+import shapely
 from cartopy.io import shapereader
 import geopandas
 
@@ -174,7 +176,7 @@ def compute_distrib_percentile(database='ERA5', datavar='t2m', daily_var='tg', y
         datadir = os.environ["DATADIR"]
 
     name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
-    name_dict_threshold = {True : 'th', False : 'C'}
+    #name_dict_threshold = {True : 'th', False : 'C'}
 
     temp_name_dict = {'tg':'mean','tx':'max','tn':'min'}
     resolution_dict = {"ERA5" : "0.25", "E-OBS" : "0.1"}
@@ -317,7 +319,8 @@ def compute_distrib_percentile(database='ERA5', datavar='t2m', daily_var='tg', y
             threshold[day_of_the_year,:,:]=ma.array(np.percentile(list_table[:],threshold_value,axis=0),mask=False)
     threshold[:] = ma.masked_outside(threshold[:],-300,400)
     f.close()
-    f_mean.close()
+    if anomaly :
+        f_mean.close()
     nc_file_out.close()
     return
 
@@ -1027,7 +1030,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     df_countries = geopandas.read_file(shpfilename)
     
     df_emdat = pd.read_excel(os.path.join(datadir,"GDIS_EM-DAT","EMDAT_Europe-1950-2022-heatwaves.xlsx"),header=0, index_col=0)
-    # cc3d labels netCDF file
+    # load cc3d labels netCDF file
     nc_file_in = os.path.join(datadir,database,datavar,"Detection_Heatwave",f"detected_heatwaves_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}.nc")
 
     f=nc.Dataset(nc_file_in,mode='r')
@@ -1071,6 +1074,39 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
                             f"maps_undetected_htws_flex_{flex_time_span}_ds")
     pathlib.Path(output_dir_anim).mkdir(parents=True,exist_ok=True)
     
+    sub_df_emdat = df_emdat[df_emdat['Dis No'].isin(undetected_htw_list)]
+    sub_df_emdat = sub_df_emdat.sort_values(by='Total Deaths',ascending=False)
+    sub_df_emdat = sub_df_emdat.fillna(0)
+    undetected_heatwaves_grouped=np.unique(sub_df_emdat.loc[:,'disasterno'])
+    df_emdat_grouped = pd.DataFrame(index=undetected_heatwaves_grouped,columns=['Total Deaths','Affected Countries (Total Deaths)'])#'Affected Countries','Affected Countries (Total Deaths)'])
+    htw_most_impact_df = pd.DataFrame(index=df_emdat_grouped.index,columns=['index','disasterno','country','Total Deaths'])
+    count_iterations=0
+    for label in df_emdat_grouped.index.values :
+        #df_emdat_grouped.loc[label,'Affected Countries'] = ', '.join([country_dict_cartopy[ctry] for ctry in (sub_df_emdat[sub_df_emdat['disasterno']==label])['Country'].tolist()])
+        df_emdat_grouped.loc[label,'Total Deaths'] = int((sub_df_emdat[sub_df_emdat['disasterno']==label])['Total Deaths'].sum())
+        l1 = [country_dict_cartopy[ctry] for ctry in (sub_df_emdat[sub_df_emdat['disasterno']==label])['Country'].tolist()]
+        l2 = [int (i) for i in (sub_df_emdat[sub_df_emdat['disasterno']==label])['Total Deaths'].tolist()]
+        list = [f"{i} ({str(j)})" for (i,j) in zip(l1,l2)]
+        if len(list) > 3 :
+            list[3]='\\\\'+list[3]
+            
+        df_emdat_grouped.loc[label,'Affected Countries (Total Deaths)'] = ', '.join(list)
+        htw_most_impact_df.loc[label,'index'] = (sub_df_emdat[sub_df_emdat['disasterno']==label])['Total Deaths'].idxmax()
+        htw_most_impact_df.loc[label,'disasterno'] = sub_df_emdat.loc[(sub_df_emdat[sub_df_emdat['disasterno']==label])['Total Deaths'].idxmax(),'Dis No']
+        htw_most_impact_df.loc[label,'country'] = l1[0]
+        htw_most_impact_df.loc[label,'Total Deaths'] = np.sum(l2)
+        count_iterations+=1
+        
+    df_emdat_grouped = df_emdat_grouped.sort_values(by='Total Deaths',ascending=False)
+    htw_most_impact_df = htw_most_impact_df.sort_values(by='Total Deaths',ascending=False)
+    plotted_htw_label = htw_most_impact_df['index'].iloc[0:3].values
+    plotted_htw_var = [[],[],[]]
+    plotted_htw_count = 0
+    plotted_htw_country = ['','','']
+    for i in range(3):
+        country_list = df_emdat_grouped.iloc[i,1].split(", ")
+        country_list[0] = "\\textbf{"+country_list[0]+"}"
+        df_emdat_grouped.iloc[i,1] = ', '.join(country_list)
     for idx in tqdm(df_emdat.index.values) :
         if df_emdat.loc[idx,'Dis No'] in undetected_htw_list :
             country=df_emdat.loc[idx,'Country']
@@ -1170,18 +1206,17 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
 
             anim = animation.FuncAnimation(fig, update, init_func=init, frames=nb_frames, blit=False, interval=0.15, repeat=False)
 
-            #plt.show()
+            plt.show()
             filename_movie = os.path.join(output_dir_anim, 
                                         f"Undetected_heatwave_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_ds.mp4")
             writervideo = animation.FFMpegWriter(fps=1)
             anim.save(filename_movie, writer=writervideo)
             ax.clear()
             plt.close()
-            
             # Make 2D map of the heatwave :
             fig_map = plt.figure(figsize=(24,16))
             ax_map = plt.axes(projection=proj_pc)
-            #ax.clear()
+            ax.clear()
             ax_map.set_extent([lon_in[0]+0.1, lon_in[-1]-0.1, lat_in[-1]+0.1, lat_in[0]-0.1])
             title = f'Temperature {name_dict_anomaly[anomaly]} (°C) average between {date_event[0]} and {date_event[-1]}.\nEM-DAT heatwave recorded in {country}.'
             ax_map.set_title(title, fontsize=25)
@@ -1192,6 +1227,11 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             ax_map.add_feature(cfeature.LAKES, alpha=0.5)
             ax_map.add_feature(cfeature.RIVERS, alpha=0.5)
             new_var = np.nanmean(temp[:],axis=0)
+            if idx in plotted_htw_label :
+                dis_no = (htw_most_impact_df[htw_most_impact_df['index']==idx]).index.values[0]
+                plotted_htw_count = int(np.argwhere(df_emdat_grouped.index==dis_no)[0][0])
+                plotted_htw_var[plotted_htw_count] = new_var
+                plotted_htw_country[plotted_htw_count] = (htw_most_impact_df[htw_most_impact_df['index']==idx])['country'].values[0]
             min_val = min(np.floor(-np.abs(np.min(new_var))),np.floor(-np.abs(np.max(new_var))))
             max_val = max(np.ceil(np.abs(np.min(new_var))),np.ceil(np.abs(np.max(new_var))))
             the_levels=[0]*11#nb of color categories + 1
@@ -1201,17 +1241,85 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             CS1 = ax_map.contourf(lons_mesh,lats_mesh,new_var,cmap='bwr',transform=proj_pc, levels=the_levels)
             cbar = fig_map.colorbar(CS1,cax=cax,ax=ax_map,orientation='horizontal')
             cbar.ax.tick_params(labelsize=20)
-            #ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
+            ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
             poly = df_countries.loc[df_countries['ADMIN'] == country_dict_cartopy[country]]['geometry'].values[0]
             try :
                 ax_map.plot(*poly.exterior.xy,'green',linewidth=3)
             except :#in case the country is not Polygon but MultiPolygon
                 for geom in poly.geoms :
                     ax_map.plot(*geom.exterior.xy,'green',linewidth=3)
-            #plt.title(f'Temperature {name_dict_anomaly[anomaly]} (°C) average between {date_event[0]} and {date_event[-1]}',{'position':(0.5,-2)})
+            plt.title(f'Temperature {name_dict_anomaly[anomaly]} (°C) average between {date_event[0]} and {date_event[-1]}',{'position':(0.5,-2)})
             plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}.png"))
             plt.close()
-            
+    
+    # Make 3maps+table plot
+    plt.rcParams['text.usetex'] = True
+    fig_subplot = plt.figure(figsize=(16,12))
+    ax1=fig_subplot.add_subplot(234,projection=ccrs.PlateCarree()).set_title('\\textbf{b}',loc='left')
+    ax2=fig_subplot.add_subplot(235,projection=ccrs.PlateCarree()).set_title('\\textbf{c}',loc='left')
+    ax3=fig_subplot.add_subplot(236,projection=ccrs.PlateCarree()).set_title('\\textbf{d}',loc='left')
+    ax4=fig_subplot.add_subplot(211).set_title('\\textbf{a}',loc='left')
+    ax_count=0
+    min_val=0
+    max_val=0
+    for ax in [ax1.axes,ax2.axes,ax3.axes] :
+        new_var = plotted_htw_var[ax_count]
+        min_val = min(min_val,min(np.floor(-np.abs(np.min(new_var))),np.floor(-np.abs(np.max(new_var)))))
+        max_val = max(max_val,max(np.ceil(np.abs(np.min(new_var))),np.ceil(np.abs(np.max(new_var)))))
+        ax_count+=1
+        
+    the_levels=[0]*11#nb of color categories + 1
+    for k in range(len(the_levels)):
+        the_levels[k]=min_val+k*(max_val-min_val)/(len(the_levels)-1)
+    ax_count=0 
+    for ax in [ax1.axes,ax2.axes,ax3.axes] :
+        ax.add_feature(cfeature.BORDERS)
+        ax.add_feature(cfeature.LAND)
+        ax.add_feature(cfeature.OCEAN)
+        ax.add_feature(cfeature.COASTLINE,linewidth=0.3)
+        ax.add_feature(cfeature.LAKES, alpha=0.5)
+        ax.add_feature(cfeature.RIVERS, alpha=0.5)
+        new_var = plotted_htw_var[ax_count]
+        country = plotted_htw_country[ax_count]
+        CS1 = ax.contourf(lons_mesh,lats_mesh,new_var,cmap='bwr',transform=proj_pc, levels=the_levels)
+        #ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
+        poly = df_countries.loc[df_countries['ADMIN'] == country]['geometry'].values[0]
+        try :
+            ax.plot(*poly.exterior.xy,'green',linewidth=3)
+        except :#in case the country is not Polygon but MultiPolygon
+            for geom in poly.geoms :
+                ax.plot(*geom.exterior.xy,'green',linewidth=3)
+        ax.set_extent([poly.bounds[0]-0.1,poly.bounds[2]+0.1,poly.bounds[1]-0.1,poly.bounds[3]+0.1])
+        ax_count+=1
+    cax = plt.axes([0.2, 0.1, 0.6, 0.025])
+    cbar = fig_subplot.colorbar(CS1,cax=cax,orientation='horizontal')
+    cbar.set_label('Average of daily maximum WBGT anomaly (°C)', rotation=0, size=25)
+    cbar.ax.tick_params(labelsize=20)
+    
+    table = ax4.axes.table(cellText=df_emdat_grouped.values,
+            rowLabels=df_emdat_grouped.index,
+            colLabels=df_emdat_grouped.columns,loc='center',cellLoc='center',colWidths=[0.15,0.5])
+    cellDict = table.get_celld()
+    for i in range(0,len(df_emdat_grouped.columns)):
+        cellDict[(0,i)].set_height(.1)
+        #cellDict[(0,i)].set_text_props(ha="center")
+        cellDict[(1,i)].set_height(4.2/30)
+        for j in range(2,len(df_emdat_grouped.values)+1):
+            cellDict[(j,i)].set_height(2.1/30)
+            #cellDict[(j,i)].set_text_props(ha="left")
+            if i==0 :
+                cellDict[(j,-1)].set_height(2.1/30)
+    #for i in range(-1,len(df_emdat_grouped.columns)):
+    #    for j in range(1,4):
+    #        cellDict[(j,i)].set_text_props(fontproperties=FontProperties(weight='bold'))
+    cellDict[(0, 0)].set_facecolor("lightgray")
+    cellDict[(0, 1)].set_facecolor("lightgray")
+    cellDict[(1,-1)].set_height(4.2/30)
+    ax4.axes.set_axis_off()
+    table.auto_set_font_size(False)
+    table.set_fontsize(15)
+    plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_subplots.pdf"),dpi=1200)
+    plt.close()
     f_land_sea_mask.close()
     f.close()
     f_temp.close()
