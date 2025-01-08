@@ -33,7 +33,7 @@ def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     print('year_end_climatology :',year_end_climatology)
     print('distrib_window_size :',distrib_window_size)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -106,7 +106,7 @@ def create_heatwaves_indices_database(database='ERA5', datavar='t2m', daily_var=
     print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -402,7 +402,7 @@ def compute_heatwaves_indices_scores(database='ERA5', datavar='t2m', daily_var='
     print('nb_days :',nb_days)
     print('count_all_impacts :',count_all_impacts)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -496,7 +496,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     print('nb_days :',nb_days)
     print('count_all_impacts :',count_all_impacts)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -770,7 +770,7 @@ def analysis_top_detected_events(database='ERA5', datavar='t2m', daily_var='tg',
     print('nb_days :',nb_days)
     print('nb_top_events :',nb_top_events)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]

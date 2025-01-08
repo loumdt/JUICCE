@@ -15,7 +15,7 @@ from analysis_classification_plot_functions import *
 # utci absolute thresholds : [26,32,38,46]
 # t2m absolute thresholds : [25,20]
 database = 'ERA5' # 'ERA5' or 'E-OBS', default value is 'ERA5'
-datavar = 'wbgt' # 't2m', 'wbgt' or 'utci' for ERA5 ; 't2m' for 'E-OBS', default value is 't2m'
+datavar = 't2m' # 't2m', 'wbgt' or 'utci' for ERA5 ; 't2m' for 'E-OBS', default value is 't2m'
 daily_var = 'tx' # 'tg', 'tn' or 'tx' (mean, min, max), default value is 'tg'
 year_beg = 1950 #beginning of the studied period, default 1950
 year_end = 2021 #end of the studied period, default 2021

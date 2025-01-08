@@ -35,7 +35,7 @@ def compute_climatology_smooth(database='ERA5', datavar='t2m', daily_var='tg', y
     print('year_beg_climatology :',year_beg_climatology)
     print('year_end_climatology :',year_end_climatology)
 
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -170,7 +170,7 @@ def compute_distrib_percentile(database='ERA5', datavar='t2m', daily_var='tg', y
     print('year_end_climatology :',year_end_climatology)
     print('distrib_window_size :',distrib_window_size)
 
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -339,7 +339,7 @@ def select_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_beg=19
     print('year_beg_climatology :',year_beg_climatology)
     print('year_end_climatology :',year_end_climatology)
 
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -504,7 +504,7 @@ def detect_potential_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', y
     print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -620,7 +620,7 @@ def cc3d_scan_heatwaves(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -869,7 +869,7 @@ def analyse_impact_overlap(database='ERA5', datavar='t2m', daily_var='tg', year_
     print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -992,7 +992,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     print('year_end_climatology :',year_end_climatology)
     print('nb_days :',nb_days)
     
-    if os.name == 'nt' :
+    if os.name == 'posix' :
         datadir = "Data/"
     else : 
         datadir = os.environ["DATADIR"]
@@ -1206,7 +1206,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
 
             anim = animation.FuncAnimation(fig, update, init_func=init, frames=nb_frames, blit=False, interval=0.15, repeat=False)
 
-            plt.show()
+            #plt.show()
             filename_movie = os.path.join(output_dir_anim, 
                                         f"Undetected_heatwave_{df_emdat.loc[idx,'Dis No']}_{date_event[0]}_{date_event[-1]}_{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}_flex_time_{flex_time_span}_ds.mp4")
             writervideo = animation.FFMpegWriter(fps=1)
