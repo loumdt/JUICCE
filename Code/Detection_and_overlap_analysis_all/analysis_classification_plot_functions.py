@@ -93,7 +93,7 @@ def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg
     return
 
 #%%
-def create_heatwaves_indices_database(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True, anomaly=True, relative_threshold=True):
+def create_heatwaves_indices_database(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, threshold_value=95, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15,nb_days=4,flex_time_span=7, count_all_impacts=True, anomaly=True, relative_threshold=True, threshold_NL=1000, coeff_PL=1000):
     '''This function is used to create the dataset of the indices of the detected heatwaves. The set of detected heatwaves depends on all the parameters.'''
 
     print('database :',database)
@@ -241,12 +241,7 @@ def create_heatwaves_indices_database(database='ERA5', datavar='t2m', daily_var=
 
     htw_criteria = ['Global_mean','Spatial_extent','Duration','Max','Max_spatial','Temp_sum','Pseudo_HWMId','Total_affected_pop','Global_mean_pop','Duration_pop','Max_pop','Max_spatial_pop',
     'Spatial_extent_pop','Temp_sum_pop','Pseudo_HWMId_pop','Multi_index_temp','Multi_index_HWMId','Temp_sum_pop_NL','Pseudo_HWMId_pop_NL','Multi_index_temp_NL','Multi_index_HWMId_NL']#,'Mean_log_GDP',
-    #'Mean_exp_GDP','Mean_inv_GDP','GDP_inv_log_temp_sum','GDP_inv_log_temp_mean']
-    #htw_criteria = ['Multi_index_temp']
-    threshold_NL = 1000
-    coeff_PL = 1000
-    #Do not forget to change this boolean if necessary
-    count_all_impacts = True
+
     print("count_all_impacts :",count_all_impacts)
 
     df_htw['Computed_heatwave'] = False
@@ -365,8 +360,8 @@ def create_heatwaves_indices_database(database='ERA5', datavar='t2m', daily_var=
                 df_htw.loc[htw_id,'Total_Deaths'] = int(df_impact['Total Deaths'].sum())
                 df_htw.loc[htw_id,'Total_Affected'] = int(df_impact['Total Affected'].sum())
                 df_htw.loc[htw_id,'Material_Damages'] = (df_impact["Total Damages, Adjusted ('000 US$)"].sum())*1e3 #in 2022 US$
-                df_htw.loc[htw_id,'Impact_sum'] = (int(df_htw.loc[htw_id,'Total_Deaths'])*(2.94e6*1.366/0.80645161)+ #2.94e6 US$ is Europe mean VSL according to WHO 2014, convert €2014 to US$2014 (*1.366),  then convert US$2014 to US$2022 (/0.806)
-                int(df_htw.loc[htw_id,'Total_Affected'])*(97e3*1.366/0.80645161)+ #mean value of affected people, convert €2014 to US$2014 (*1.366),  then convert US$2014 to US$2022 (/0.806)
+                df_htw.loc[htw_id,'Impact_sum'] = (int(df_htw.loc[htw_id,'Total_Deaths'])*(2.907921e6*1.1069*1.2194)+ #2.907e6 2016€ is UE28 mean VSL (according to Handbook on the external costs of transport: version 2019, European Commission), then convert €2016 to US$2016 (*1.1069),  then convert US$2016 to US$2022 (*1.2194)
+                int(df_htw.loc[htw_id,'Total_Affected'])*(2.907921e6*0.07*1.1069*1.2194)+ #mean value of affected people (7% of the VSL), convert €2016 to US$2016 (*1.1069),  then convert US$2014 – 1.16 to US$2022 (*1.2194)
                 (df_htw.loc[htw_id,'Material_Damages'])) #socio-economic calculation, in 2022 US$
 
     #Save dataframe 
