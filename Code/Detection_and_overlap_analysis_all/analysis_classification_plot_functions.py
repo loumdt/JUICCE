@@ -22,7 +22,7 @@ from sklearn import metrics
 #%%
 def compute_Russo_HWMId(database='ERA5', datavar='t2m', daily_var='tg', year_beg=1950, year_end=2021, year_beg_climatology=1950, year_end_climatology=2021, distrib_window_size=15, anomaly=True):
     """Compute the pseudo_HWMId index map.
-    Based on HWMId defined by Russo et al (2015, http://dx.doi.org/10.1088/1748-9326/10/12/124003 )."""
+    Based on HWMId defined by Russo et al (2015, https://dx.doi.org/10.1088/1748-9326/10/12/124003 )."""
 
     print('database :',database)
     print('datavar :',datavar)
