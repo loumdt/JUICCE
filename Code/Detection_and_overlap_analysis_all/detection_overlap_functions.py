@@ -1103,7 +1103,7 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
     plotted_htw_var = [[],[],[]]
     plotted_htw_count = 0
     plotted_htw_country = ['','','']
-    for i in range(3):
+    for i in range(np.min([3,len(df_emdat_grouped)])):
         country_list = df_emdat_grouped.iloc[i,1].split(", ")
         country_list[0] = "\\textbf{"+country_list[0]+"}"
         df_emdat_grouped.iloc[i,1] = ', '.join(country_list)
@@ -1253,73 +1253,74 @@ def undetected_heatwaves_animation(database='ERA5', datavar='t2m', daily_var='tg
             plt.close()
     
     # Make 3maps+table plot
-    plt.rcParams['text.usetex'] = True
-    fig_subplot = plt.figure(figsize=(16,12))
-    ax1=fig_subplot.add_subplot(234,projection=ccrs.PlateCarree()).set_title('\\textbf{b}',loc='left')
-    ax2=fig_subplot.add_subplot(235,projection=ccrs.PlateCarree()).set_title('\\textbf{c}',loc='left')
-    ax3=fig_subplot.add_subplot(236,projection=ccrs.PlateCarree()).set_title('\\textbf{d}',loc='left')
-    ax4=fig_subplot.add_subplot(211).set_title('\\textbf{a}',loc='left')
-    ax_count=0
-    min_val=0
-    max_val=0
-    for ax in [ax1.axes,ax2.axes,ax3.axes] :
-        new_var = plotted_htw_var[ax_count]
-        min_val = min(min_val,min(np.floor(-np.abs(np.min(new_var))),np.floor(-np.abs(np.max(new_var)))))
-        max_val = max(max_val,max(np.ceil(np.abs(np.min(new_var))),np.ceil(np.abs(np.max(new_var)))))
-        ax_count+=1
+    if len(df_emdat_grouped)>=3 :
+        plt.rcParams['text.usetex'] = True
+        fig_subplot = plt.figure(figsize=(16,12))
+        ax1=fig_subplot.add_subplot(234,projection=ccrs.PlateCarree()).set_title('\\textbf{b}',loc='left')
+        ax2=fig_subplot.add_subplot(235,projection=ccrs.PlateCarree()).set_title('\\textbf{c}',loc='left')
+        ax3=fig_subplot.add_subplot(236,projection=ccrs.PlateCarree()).set_title('\\textbf{d}',loc='left')
+        ax4=fig_subplot.add_subplot(211).set_title('\\textbf{a}',loc='left')
+        ax_count=0
+        min_val=0
+        max_val=0
+        for ax in [ax1.axes,ax2.axes,ax3.axes] :
+            new_var = plotted_htw_var[ax_count]
+            min_val = min(min_val,min(np.floor(-np.abs(np.min(new_var))),np.floor(-np.abs(np.max(new_var)))))
+            max_val = max(max_val,max(np.ceil(np.abs(np.min(new_var))),np.ceil(np.abs(np.max(new_var)))))
+            ax_count+=1
+            
+        the_levels=[0]*11#nb of color categories + 1
+        for k in range(len(the_levels)):
+            the_levels[k]=min_val+k*(max_val-min_val)/(len(the_levels)-1)
+        ax_count=0 
+        for ax in [ax1.axes,ax2.axes,ax3.axes] :
+            ax.add_feature(cfeature.BORDERS)
+            ax.add_feature(cfeature.LAND)
+            ax.add_feature(cfeature.OCEAN)
+            ax.add_feature(cfeature.COASTLINE,linewidth=0.3)
+            ax.add_feature(cfeature.LAKES, alpha=0.5)
+            ax.add_feature(cfeature.RIVERS, alpha=0.5)
+            new_var = plotted_htw_var[ax_count]
+            country = plotted_htw_country[ax_count]
+            CS1 = ax.contourf(lons_mesh,lats_mesh,new_var,cmap='bwr',transform=proj_pc, levels=the_levels)
+            #ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
+            poly = df_countries.loc[df_countries['ADMIN'] == country]['geometry'].values[0]
+            try :
+                ax.plot(*poly.exterior.xy,'green',linewidth=3)
+            except :#in case the country is not Polygon but MultiPolygon
+                for geom in poly.geoms :
+                    ax.plot(*geom.exterior.xy,'green',linewidth=3)
+            ax.set_extent([poly.bounds[0]-0.1,poly.bounds[2]+0.1,poly.bounds[1]-0.1,poly.bounds[3]+0.1])
+            ax_count+=1
+        cax = plt.axes([0.2, 0.1, 0.6, 0.025])
+        cbar = fig_subplot.colorbar(CS1,cax=cax,orientation='horizontal')
+        cbar.set_label('Average of daily maximum WBGT anomaly (°C)', rotation=0, size=25)
+        cbar.ax.tick_params(labelsize=20)
         
-    the_levels=[0]*11#nb of color categories + 1
-    for k in range(len(the_levels)):
-        the_levels[k]=min_val+k*(max_val-min_val)/(len(the_levels)-1)
-    ax_count=0 
-    for ax in [ax1.axes,ax2.axes,ax3.axes] :
-        ax.add_feature(cfeature.BORDERS)
-        ax.add_feature(cfeature.LAND)
-        ax.add_feature(cfeature.OCEAN)
-        ax.add_feature(cfeature.COASTLINE,linewidth=0.3)
-        ax.add_feature(cfeature.LAKES, alpha=0.5)
-        ax.add_feature(cfeature.RIVERS, alpha=0.5)
-        new_var = plotted_htw_var[ax_count]
-        country = plotted_htw_country[ax_count]
-        CS1 = ax.contourf(lons_mesh,lats_mesh,new_var,cmap='bwr',transform=proj_pc, levels=the_levels)
-        #ax.scatter(X_scatt[i],Y_scatt[i],marker='o',s=1,alpha=1,color='black',transform=proj_pc,zorder=100)
-        poly = df_countries.loc[df_countries['ADMIN'] == country]['geometry'].values[0]
-        try :
-            ax.plot(*poly.exterior.xy,'green',linewidth=3)
-        except :#in case the country is not Polygon but MultiPolygon
-            for geom in poly.geoms :
-                ax.plot(*geom.exterior.xy,'green',linewidth=3)
-        ax.set_extent([poly.bounds[0]-0.1,poly.bounds[2]+0.1,poly.bounds[1]-0.1,poly.bounds[3]+0.1])
-        ax_count+=1
-    cax = plt.axes([0.2, 0.1, 0.6, 0.025])
-    cbar = fig_subplot.colorbar(CS1,cax=cax,orientation='horizontal')
-    cbar.set_label('Average of daily maximum WBGT anomaly (°C)', rotation=0, size=25)
-    cbar.ax.tick_params(labelsize=20)
-    
-    table = ax4.axes.table(cellText=df_emdat_grouped.values,
-            rowLabels=df_emdat_grouped.index,
-            colLabels=df_emdat_grouped.columns,loc='center',cellLoc='center',colWidths=[0.15,0.5])
-    cellDict = table.get_celld()
-    for i in range(0,len(df_emdat_grouped.columns)):
-        cellDict[(0,i)].set_height(.1)
-        #cellDict[(0,i)].set_text_props(ha="center")
-        cellDict[(1,i)].set_height(4.2/30)
-        for j in range(2,len(df_emdat_grouped.values)+1):
-            cellDict[(j,i)].set_height(2.1/30)
-            #cellDict[(j,i)].set_text_props(ha="left")
-            if i==0 :
-                cellDict[(j,-1)].set_height(2.1/30)
-    #for i in range(-1,len(df_emdat_grouped.columns)):
-    #    for j in range(1,4):
-    #        cellDict[(j,i)].set_text_props(fontproperties=FontProperties(weight='bold'))
-    cellDict[(0, 0)].set_facecolor("lightgray")
-    cellDict[(0, 1)].set_facecolor("lightgray")
-    cellDict[(1,-1)].set_height(4.2/30)
-    ax4.axes.set_axis_off()
-    table.auto_set_font_size(False)
-    table.set_fontsize(15)
-    plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_subplots.pdf"),dpi=1200)
-    plt.close()
+        table = ax4.axes.table(cellText=df_emdat_grouped.values,
+                rowLabels=df_emdat_grouped.index,
+                colLabels=df_emdat_grouped.columns,loc='center',cellLoc='center',colWidths=[0.15,0.5])
+        cellDict = table.get_celld()
+        for i in range(0,len(df_emdat_grouped.columns)):
+            cellDict[(0,i)].set_height(.1)
+            #cellDict[(0,i)].set_text_props(ha="center")
+            cellDict[(1,i)].set_height(4.2/30)
+            for j in range(2,len(df_emdat_grouped.values)+1):
+                cellDict[(j,i)].set_height(2.1/30)
+                #cellDict[(j,i)].set_text_props(ha="left")
+                if i==0 :
+                    cellDict[(j,-1)].set_height(2.1/30)
+        #for i in range(-1,len(df_emdat_grouped.columns)):
+        #    for j in range(1,4):
+        #        cellDict[(j,i)].set_text_props(fontproperties=FontProperties(weight='bold'))
+        cellDict[(0, 0)].set_facecolor("lightgray")
+        cellDict[(0, 1)].set_facecolor("lightgray")
+        cellDict[(1,-1)].set_height(4.2/30)
+        ax4.axes.set_axis_off()
+        table.auto_set_font_size(False)
+        table.set_fontsize(15)
+        plt.savefig(os.path.join(output_dir_anim,f"Undetected_htw_subplots.pdf"),dpi=1200)
+        plt.close()
     f_land_sea_mask.close()
     f.close()
     f_temp.close()
