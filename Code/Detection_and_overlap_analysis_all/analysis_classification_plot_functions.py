@@ -405,7 +405,6 @@ def compute_heatwaves_indices_scores(database='ERA5', datavar='t2m', daily_var='
     name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
     name_dict_threshold = {True : 'th', False : 'C'}
     
-    count_all_impacts = True #True : count all affected countries according to EM-DAT ; False : #count only visibly affected countries according to meteo database
     dataframe_dir = os.path.join("Output",database,f"{datavar}_{daily_var}",
                                         f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     df_htw = pd.read_excel(os.path.join(dataframe_dir,
@@ -423,7 +422,7 @@ def compute_heatwaves_indices_scores(database='ERA5', datavar='t2m', daily_var='
     figs_output_dir = os.path.join(dataframe_dir,f"figs_flex_time_span_{flex_time_span}","roc_curve")
     pathlib.Path(figs_output_dir).mkdir(parents=True, exist_ok=True) #create output directory and parent directories if necessary
 
-    for chosen_impact in ['Total_Deaths']:#tqdm(impact_criteria) :
+    for chosen_impact in ['Total_Deaths','Impact_sum']:#tqdm(impact_criteria) :
         for chosen_meteo in meteo_criteria :
             extreme_list_impact = [df_htw.loc[i,chosen_impact] for i in df_htw[df_htw['Extreme_heatwave']==True].index.values[:]]
             extreme_list_meteo = [df_htw.loc[i,chosen_meteo] for i in df_htw[df_htw['Extreme_heatwave']==True].index.values[:]]
@@ -499,7 +498,6 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     name_dict_anomaly = {True : 'anomaly', False : 'absolute'}
     name_dict_threshold = {True : 'th', False : 'C'}
     
-    count_all_impacts = True #True : count all affected countries according to EM-DAT ; False : #count only visibly affected countries according to ERA5
     dataframe_dir = os.path.join("Output",database,f"{datavar}_{daily_var}",
                                         f"{database}_{datavar}_{daily_var}_{name_dict_anomaly[anomaly]}_JJA_{nb_days}days_before_scan_{year_beg}_{year_end}_{threshold_value}{name_dict_threshold[relative_threshold]}_{distrib_window_size}days_window_climatology_{year_beg_climatology}_{year_end_climatology}")
     df_htw = pd.read_excel(os.path.join(dataframe_dir,
@@ -617,13 +615,13 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
     for chosen_impact in impact_criteria :
         scatter_list_impact = [df_htw.loc[i,chosen_impact] for i in df_htw[df_htw['Extreme_heatwave']==True].index.values[:]]
         if len(scatter_list_impact)>=2 :
-            for chosen_meteo in meteo_criteria :
+            for chosen_meteo in tqdm(meteo_criteria) :
                 scatter_list_meteo = [df_htw.loc[i,chosen_meteo] for i in df_htw[df_htw['Extreme_heatwave']==True].index.values[:]]
                 meteo_list = [df_htw.loc[i,chosen_meteo] for i in df_htw[df_htw['Computed_heatwave']==True].index.values[:]]
 
                 min_val = np.min(meteo_list)
                 max_val = np.max(meteo_list)
-                print(chosen_meteo,'min',np.min(meteo_list),'max',np.max(meteo_list))
+                #print(chosen_meteo,'min',np.min(meteo_list),'max',np.max(meteo_list))
                 fig = plt.figure(1,figsize=(24,16),facecolor='white')
                 if dict_func[chosen_meteo] == id_func :
                     Y,bins_edges=np.histogram(meteo_list,bins=np.linspace(start=min_val*min_boundary(min_val), stop=max_val*max_boundary(max_val), num=30)) #histogram of the E-OBS heatwaves distribution
@@ -643,7 +641,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
                     plt.semilogx(X,Y2,'r-')
                 plt.plot(X,Y,'ko')
                 plt.plot(X,Y2,'r-')
-                plt.ylim([-2,50])
+                plt.ylim([-2,45])
                 plt.xlim([min_val*min_boundary(min_val),max_val*max_boundary(max_val)])
                 plt.axvline(np.percentile(meteo_list,25),linewidth=2) #add 1st quartile of the meteo criterion list
                 plt.axvline(np.median(meteo_list),linewidth=2) #add median of the meteo criterion list
@@ -695,7 +693,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
             #    plt.semilogx(X,Y,'ko')
                 ax1.semilogx(X,Y2,'r-')
             #plt.plot(X,Y,'ko')
-            ax1.set_ylim([-1,25])
+            ax1.set_ylim([-1,45])
             ax1.set_xlim([min_val*min_boundary(min_val),max_val*max_boundary(max_val)])
             ax1.axvline(np.percentile(meteo_list,25),linewidth=2) #add 1st quartile of the meteo criterion list
             ax1.axvline(np.median(meteo_list),linewidth=2) #add median of the meteo criterion list
@@ -704,7 +702,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
             ax1.set_ylabel("Frequency", fontsize = 20.0) # Y label
             ax1.set_xlabel(worst_scoring_index, fontsize = 20) # X label
             ax1.tick_params(axis='both', which='major', labelsize=20)
-            plt.text(.05, .9, 'Worst', ha='left', va='top', fontsize=30, transform=ax1.transAxes,bbox=dict(boxstyle="round", ec=(0.0, 0.0, 0.0), fc=(1., 1, 1)))
+            plt.text(.7, .9, 'Worst', ha='left', va='top', fontsize=30, transform=ax1.transAxes,bbox=dict(boxstyle="round", ec=(0.0, 0.0, 0.0), fc=(1., 1, 1)))
             for k in range(len(scatter_list_meteo)):
                 closest_x = min(range(len(X)), key=lambda i: abs(X[i]-scatter_list_meteo[k]))
                 CS1 = ax1.scatter(np.linspace(scatter_list_meteo[k],scatter_list_meteo[k],1000),np.linspace(0,Y2[closest_x],1000),c=[scatter_list_impact[k]]*1000,edgecolor=None, cmap = 'YlOrRd',norm=clrs_dico[chosen_impact],linewidths=4)
@@ -730,7 +728,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
             #    plt.semilogx(X,Y,'ko')
                 ax2.semilogx(X,Y2,'r-')
             #plt.plot(X,Y,'ko')
-            ax2.set_ylim([-1,25])
+            ax2.set_ylim([-1,45])
             ax2.set_xlim([min_val*min_boundary(min_val),max_val*max_boundary(max_val)])
             ax2.axvline(np.percentile(meteo_list,25),linewidth=2) #add 1st quartile of the meteo criterion list
             ax2.axvline(np.median(meteo_list),linewidth=2) #add median of the meteo criterion list
@@ -739,7 +737,7 @@ def plot_heatwaves_distribution(database='ERA5', datavar='t2m', daily_var='tg', 
             ax2.set_ylabel("Frequency", fontsize = 20.0) # Y label
             ax2.set_xlabel(best_scoring_index, fontsize = 20) # X label
             ax2.tick_params(axis='both', which='major', labelsize=20)
-            plt.text(.05, .9, 'Best', ha='left', va='top', fontsize=30, transform=ax2.transAxes,bbox=dict(boxstyle="round", ec=(0.0, 0.0, 0.0), fc=(1., 1, 1)))
+            plt.text(.2, .9, 'Best', ha='left', va='top', fontsize=30, transform=ax2.transAxes,bbox=dict(boxstyle="round", ec=(0.0, 0.0, 0.0), fc=(1., 1, 1)))
             for k in range(len(scatter_list_meteo)):
                 closest_x = min(range(len(X)), key=lambda i: abs(X[i]-scatter_list_meteo[k]))
                 CS2 = ax2.scatter(np.linspace(scatter_list_meteo[k],scatter_list_meteo[k],1000),np.linspace(0,Y2[closest_x],1000),c=[scatter_list_impact[k]]*1000,edgecolor=None, cmap = 'YlOrRd',norm=clrs_dico[chosen_impact],linewidths=4)
