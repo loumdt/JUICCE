@@ -434,6 +434,8 @@ def select_scale_jja(database='ERA5', datavar='t2m', daily_var='tg', year_beg=19
         f_threshold = nc.Dataset(f_threshold_name, mode='r')
         threshold_table = f_threshold.variables['threshold'][:]
         threshold_table=ma.masked_outside(threshold_table[152:244,:,:],-300,400) #threshold of n-th (default 95th) temperature anomaly (or absolute temperature) percentile for every day of JJA and location
+    elif datavar=="utci" or (database=="ERA5" and datavar=="t2m") :
+        threshold_table = threshold_value+273.15 #in this case, threshold_table is only a scalar, add 273.15 because data is in K
     else :
         threshold_table = threshold_value #in this case, threshold_table is only a scalar
     #-------------------------------------
